@@ -1,4 +1,4 @@
-import express, { Response } from 'express';
+import express, { Request, Response } from 'express';
 import { authenticateFirebaseToken, AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler, CustomError } from '../middleware/errorHandler';
 import { prisma } from '../index';
@@ -74,6 +74,10 @@ router.get('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticate
 router.get('/:id', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
   const { id } = req.params;
+
+  if (!id) {
+    throw new CustomError('Workflow ID is required', 400);
+  }
 
   const workflow = await prisma.workflow.findFirst({
     where: { id, userId: user.id },
@@ -382,7 +386,7 @@ router.get('/:id/executions', authenticateFirebaseToken, asyncHandler(async (req
 }));
 
 // Get workflow templates (public workflows)
-router.get('/templates/public', asyncHandler(async (req, res: Response) => {
+router.get('/templates/public', asyncHandler(async (req: Request, res: Response) => {
   const { category, search } = req.query;
   
   const where: any = { isPublic: true };

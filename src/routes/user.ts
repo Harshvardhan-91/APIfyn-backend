@@ -1,4 +1,4 @@
-import express, { Response } from 'express';
+import express, { Request, Response } from 'express';
 import { authenticateFirebaseToken, AuthenticatedRequest, requireRole } from '../middleware/auth';
 import { asyncHandler, CustomError } from '../middleware/errorHandler';
 import { prisma } from '../index';

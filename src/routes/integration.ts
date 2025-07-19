@@ -1,4 +1,4 @@
-import express, { Response } from 'express';
+import express, { Request, Response } from 'express';
 import { authenticateFirebaseToken, AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler, CustomError } from '../middleware/errorHandler';
 import { prisma } from '../index';
@@ -80,6 +80,10 @@ router.put('/:id', authenticateFirebaseToken, asyncHandler(async (req: Authentic
   const { id } = req.params;
   const { name, config, isActive } = req.body;
 
+  if (!id) {
+    throw new CustomError('Integration ID is required', 400);
+  }
+
   const integration = await prisma.integration.findFirst({
     where: { id, userId: user.id },
   });
@@ -117,6 +121,10 @@ router.delete('/:id', authenticateFirebaseToken, asyncHandler(async (req: Authen
   const user = req.user;
   const { id } = req.params;
 
+  if (!id) {
+    throw new CustomError('Integration ID is required', 400);
+  }
+
   const integration = await prisma.integration.findFirst({
     where: { id, userId: user.id },
   });
@@ -141,6 +149,10 @@ router.delete('/:id', authenticateFirebaseToken, asyncHandler(async (req: Authen
 router.post('/:id/test', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
   const { id } = req.params;
+
+  if (!id) {
+    throw new CustomError('Integration ID is required', 400);
+  }
 
   const integration = await prisma.integration.findFirst({
     where: { id, userId: user.id },
@@ -168,7 +180,7 @@ router.post('/:id/test', authenticateFirebaseToken, asyncHandler(async (req: Aut
 }));
 
 // Get available integration types
-router.get('/types', asyncHandler(async (req, res: Response) => {
+router.get('/types', asyncHandler(async (req: Request, res: Response) => {
   const integrationTypes = [
     {
       type: 'GMAIL',
