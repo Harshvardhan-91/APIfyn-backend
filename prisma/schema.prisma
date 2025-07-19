@@ -1,0 +1,306 @@
+// Prisma schema file for FlowAPI automation platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and profile
+model User {
+  id              String    @id @default(cuid())
+  firebaseUid     String    @unique
+  email           String    @unique
+  displayName     String?
+  photoURL        String?
+  emailVerified   Boolean   @default(false)
+  role            UserRole  @default(USER)
+  subscription    SubscriptionTier @default(FREE)
+  
+  // Profile information
+  firstName       String?
+  lastName        String?
+  company         String?
+  jobTitle        String?
+  
+  // Subscription and billing
+  stripeCustomerId String?
+  subscriptionId   String?
+  subscriptionStatus String?
+  trialEndsAt     DateTime?
+  
+  // Usage tracking
+  apiCallsUsed    Int       @default(0)
+  workflowsUsed   Int       @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+  
+  // Relations
+  workflows       Workflow[]
+  executions      WorkflowExecution[]
+  integrations    Integration[]
+  notifications   Notification[]
+  apiKeys         ApiKey[]
+  
+  @@map("users")
+}
+
+// Workflow definition model
+model Workflow {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  
+  // Workflow configuration
+  definition      Json      // Stores the workflow structure
+  isActive        Boolean   @default(true)
+  isPublic        Boolean   @default(false)
+  
+  // Metadata
+  category        String?
+  tags            String[]
+  version         Int       @default(1)
+  
+  // Triggers
+  triggerType     TriggerType
+  triggerConfig   Json?
+  
+  // Execution settings
+  timeout         Int       @default(300) // seconds
+  retryAttempts   Int       @default(3)
+  
+  // Statistics
+  totalRuns       Int       @default(0)
+  successfulRuns  Int       @default(0)
+  failedRuns      Int       @default(0)
+  lastExecutedAt  DateTime?
+  avgExecutionTime Float?   // in seconds
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions      WorkflowExecution[]
+  schedules       WorkflowSchedule[]
+  
+  @@map("workflows")
+}
+
+// Workflow execution logs
+model WorkflowExecution {
+  id              String    @id @default(cuid())
+  
+  // Execution details
+  status          ExecutionStatus
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  duration        Float?    // in seconds
+  
+  // Input/Output
+  inputData       Json?
+  outputData      Json?
+  errorMessage    String?
+  errorStack      String?
+  
+  // Steps executed
+  stepsExecuted   Json[]    // Array of step execution details
+  currentStep     Int?
+  totalSteps      Int?
+  
+  // Metadata
+  triggerSource   String?   // webhook, schedule, manual, etc.
+  executionMode   ExecutionMode @default(NORMAL)
+  
+  createdAt       DateTime  @default(now())
+  
+  // Relations
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("workflow_executions")
+}
+
+// Integration configurations
+model Integration {
+  id              String    @id @default(cuid())
+  name            String
+  type            IntegrationType
+  
+  // Configuration
+  config          Json      // Stores API keys, OAuth tokens, etc.
+  isActive        Boolean   @default(true)
+  
+  // OAuth specific
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
+  
+  // Usage tracking
+  totalCalls      Int       @default(0)
+  lastUsedAt      DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("integrations")
+}
+
+// Scheduled workflow runs
+model WorkflowSchedule {
+  id              String    @id @default(cuid())
+  
+  // Schedule configuration
+  cronExpression  String
+  timezone        String    @default("UTC")
+  isActive        Boolean   @default(true)
+  
+  // Execution tracking
+  nextRunAt       DateTime?
+  lastRunAt       DateTime?
+  runCount        Int       @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  @@map("workflow_schedules")
+}
+
+// User notifications
+model Notification {
+  id              String    @id @default(cuid())
+  title           String
+  message         String
+  type            NotificationType
+  isRead          Boolean   @default(false)
+  
+  // Optional data
+  metadata        Json?
+  actionUrl       String?
+  
+  createdAt       DateTime  @default(now())
+  readAt          DateTime?
+  
+  // Relations
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("notifications")
+}
+
+// API keys for external access
+model ApiKey {
+  id              String    @id @default(cuid())
+  name            String
+  keyHash         String    @unique
+  keyPreview      String    // First 8 chars for display
+  
+  // Permissions
+  permissions     String[]  // Array of permission strings
+  
+  // Usage tracking
+  lastUsedAt      DateTime?
+  totalRequests   Int       @default(0)
+  
+  // Limits
+  rateLimit       Int?      // requests per minute
+  expiresAt       DateTime?
+  
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  
+  // Relations
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("api_keys")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum TriggerType {
+  MANUAL
+  WEBHOOK
+  SCHEDULE
+  EMAIL
+  API_CALL
+  FILE_UPLOAD
+  DATABASE_CHANGE
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+enum ExecutionMode {
+  NORMAL
+  TEST
+  DEBUG
+}
+
+enum IntegrationType {
+  GMAIL
+  SLACK
+  NOTION
+  GOOGLE_SHEETS
+  AIRTABLE
+  SALESFORCE
+  HUBSPOT
+  WEBHOOK
+  REST_API
+  GRAPHQL
+  DATABASE
+  FTP
+  SFTP
+  AWS_S3
+  DROPBOX
+  GOOGLE_DRIVE
+  CUSTOM
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  WORKFLOW_COMPLETE
+  WORKFLOW_FAILED
+  INTEGRATION_CONNECTED
+  INTEGRATION_DISCONNECTED
+  SUBSCRIPTION_UPDATED
+  QUOTA_WARNING
+  QUOTA_EXCEEDED
+}
