@@ -4,8 +4,10 @@
   "description": "FlowAPI Backend Server with Firebase Auth and PostgreSQL",
   "main": "dist/index.js",
   "scripts": {
-    "build": "npx prisma generate && tsc && echo 'Build completed successfully'",
-    "start": "node dist/index.js",
+    "build": "npx prisma generate && tsc",
+    "start": "node dist/index.js || npx ts-node src/index.ts",
+    "start:prod": "node dist/index.js",
+    "start:ts": "npx ts-node src/index.ts",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "dev:watch": "nodemon --exec ts-node src/index.ts",
     "test": "jest",
@@ -34,7 +36,8 @@
     "winston": "^3.11.0",
     "compression": "^1.7.4",
     "typescript": "^5.3.3",
-    "prisma": "^5.8.1"
+    "prisma": "^5.8.1",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1",
@@ -44,7 +47,6 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.7.5",
     "@types/node": "^20.10.5",
-    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "@types/jest": "^29.5.8",
     "jest": "^29.7.0",
