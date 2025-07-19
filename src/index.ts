@@ -31,19 +31,23 @@ const PORT = process.env.PORT || 5000;
 const initializeFirebase = async (): Promise<void> => {
   if (!admin.apps.length) {
     try {
-      const serviceAccount = {
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      };
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-      if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
+      if (!projectId || !clientEmail || !privateKey) {
         throw new Error('Missing Firebase credentials in environment variables');
       }
 
+      const serviceAccount = {
+        projectId,
+        clientEmail,
+        privateKey,
+      };
+
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        projectId: process.env.FIREBASE_PROJECT_ID,
+        projectId,
       });
 
       logger.info('Firebase Admin initialized successfully');
@@ -59,12 +63,28 @@ const initializeFirebase = async (): Promise<void> => {
 // Initialize database connection
 const initializeDatabase = async (): Promise<void> => {
   try {
+    // Check if DATABASE_URL is properly set
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+
+    // Log the database host (without credentials) for debugging
+    const dbUrl = new URL(process.env.DATABASE_URL);
+    logger.info(`Attempting to connect to database at: ${dbUrl.hostname}:${dbUrl.port}`);
+
     await prisma.$connect();
     logger.info('Database connected successfully');
+    
+    // Test the connection
+    await prisma.$queryRaw`SELECT 1`;
+    logger.info('Database connection test successful');
   } catch (error) {
     logger.error('Database connection error:', error);
     if (process.env.NODE_ENV === 'production') {
+      logger.error('Exiting due to database connection failure in production');
       process.exit(1);
+    } else {
+      logger.warn('Continuing without database in development mode');
     }
   }
 };
