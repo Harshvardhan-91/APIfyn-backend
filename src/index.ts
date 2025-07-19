@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import { PrismaClient } from '@prisma/client';
 import { createLogger } from './utils/logger';
+import { getDatabaseUrl } from './utils/env';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
@@ -24,7 +25,7 @@ export const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
+      url: getDatabaseUrl(),
     },
   },
 });
@@ -68,14 +69,12 @@ const initializeFirebase = async (): Promise<void> => {
 // Initialize database connection
 const initializeDatabase = async (): Promise<void> => {
   try {
-    // Check if DATABASE_URL is properly set
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL environment variable is not set');
-    }
-
+    // Get the properly formatted database URL
+    const dbUrl = getDatabaseUrl();
+    
     // Log the database host (without credentials) for debugging
-    const dbUrl = new URL(process.env.DATABASE_URL);
-    logger.info(`Attempting to connect to database at: ${dbUrl.hostname}:${dbUrl.port}`);
+    const parsedUrl = new URL(dbUrl);
+    logger.info(`Attempting to connect to database at: ${parsedUrl.hostname}:${parsedUrl.port}`);
 
     await prisma.$connect();
     logger.info('Database connected successfully');
