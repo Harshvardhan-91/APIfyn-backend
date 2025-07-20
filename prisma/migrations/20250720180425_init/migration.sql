@@ -20,6 +20,59 @@ CREATE TYPE "IntegrationType" AS ENUM ('GMAIL', 'SLACK', 'NOTION', 'GOOGLE_SHEET
 CREATE TYPE "NotificationType" AS ENUM ('INFO', 'SUCCESS', 'WARNING', 'ERROR', 'WORKFLOW_COMPLETE', 'WORKFLOW_FAILED', 'INTEGRATION_CONNECTED', 'INTEGRATION_DISCONNECTED', 'SUBSCRIPTION_UPDATED', 'QUOTA_WARNING', 'QUOTA_EXCEEDED');
 
 -- CreateTable
+CREATE TABLE "plans" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "monthlyPrice" DOUBLE PRECISION NOT NULL,
+    "yearlyPrice" DOUBLE PRECISION NOT NULL,
+    "features" TEXT[],
+    "apiCallsLimit" INTEGER NOT NULL,
+    "workflowsLimit" INTEGER NOT NULL,
+    "type" "SubscriptionTier" NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "plans_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "subscriptions" (
+    "id" TEXT NOT NULL,
+    "razorpaySubId" TEXT,
+    "status" TEXT NOT NULL,
+    "currentPeriodStart" TIMESTAMP(3) NOT NULL,
+    "currentPeriodEnd" TIMESTAMP(3) NOT NULL,
+    "cancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT false,
+    "interval" TEXT NOT NULL,
+    "intervalCount" INTEGER NOT NULL DEFAULT 1,
+    "planId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "payments" (
+    "id" TEXT NOT NULL,
+    "razorpayPaymentId" TEXT NOT NULL,
+    "amount" DOUBLE PRECISION NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'INR',
+    "status" TEXT NOT NULL,
+    "orderType" TEXT NOT NULL,
+    "razorpayOrderId" TEXT,
+    "razorpaySignature" TEXT,
+    "subscriptionId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "metadata" JSONB,
+
+    CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "firebaseUid" TEXT NOT NULL,
@@ -28,15 +81,10 @@ CREATE TABLE "users" (
     "photoURL" TEXT,
     "emailVerified" BOOLEAN NOT NULL DEFAULT false,
     "role" "UserRole" NOT NULL DEFAULT 'USER',
-    "subscription" "SubscriptionTier" NOT NULL DEFAULT 'FREE',
     "firstName" TEXT,
     "lastName" TEXT,
     "company" TEXT,
     "jobTitle" TEXT,
-    "stripeCustomerId" TEXT,
-    "subscriptionId" TEXT,
-    "subscriptionStatus" TEXT,
-    "trialEndsAt" TIMESTAMP(3),
     "apiCallsUsed" INTEGER NOT NULL DEFAULT 0,
     "workflowsUsed" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -166,6 +214,18 @@ CREATE TABLE "api_keys" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "plans_name_key" ON "plans"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "subscriptions_razorpaySubId_key" ON "subscriptions"("razorpaySubId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "subscriptions_userId_key" ON "subscriptions"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payments_razorpayPaymentId_key" ON "payments"("razorpayPaymentId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "users_firebaseUid_key" ON "users"("firebaseUid");
 
 -- CreateIndex
@@ -175,13 +235,25 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "api_keys_keyHash_key" ON "api_keys"("keyHash");
 
 -- AddForeignKey
+ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_planId_fkey" FOREIGN KEY ("planId") REFERENCES "plans"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payments" ADD CONSTRAINT "payments_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payments" ADD CONSTRAINT "payments_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "workflows" ADD CONSTRAINT "workflows_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "workflow_executions" ADD CONSTRAINT "workflow_executions_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "workflows"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "workflow_executions" ADD CONSTRAINT "workflow_executions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "workflow_executions" ADD CONSTRAINT "workflow_executions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "workflow_executions" ADD CONSTRAINT "workflow_executions_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "workflows"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "integrations" ADD CONSTRAINT "integrations_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

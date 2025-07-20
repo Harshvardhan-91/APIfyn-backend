@@ -13,6 +13,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import workflowRoutes from './routes/workflow';
 import integrationRoutes from './routes/integration';
+import subscriptionRoutes from './routes/subscription';
 
 // Load environment variables
 dotenv.config();
@@ -113,6 +114,8 @@ app.use(helmet({
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:5173', // Local development
+  'https://apifyn.onrender.com', // Production backend
+  'https://apifyn-frontend.onrender.com', // Production frontend
   process.env.CLIENT_URL, // Frontend URL from environment
   process.env.FRONTEND_URL, // Alternative frontend URL env var
 ].filter(Boolean); // Remove any undefined values
@@ -120,18 +123,23 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // In development, be more permissive
+    if (process.env.NODE_ENV === 'development') {
+      callback(null, true);
+      return;
+    }
+    
+    // In production, strictly check against allowed origins
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      // In development, be more permissive
-      if (process.env.NODE_ENV !== 'production') {
-        callback(null, true);
-      } else {
-        logger.warn(`CORS blocked origin: ${origin}`);
-        callback(new Error('Not allowed by CORS'));
-      }
+      logger.warn(`Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
@@ -175,6 +183,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/integration', integrationRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
