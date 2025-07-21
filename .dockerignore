@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+dist
+.env
+*.sqlite
+coverage
+.git
+.gitignore
+README.md
+readme-frontend.md
