@@ -112,13 +112,22 @@ app.use(helmet({
 }));
 
 // CORS configuration
-const allowedOrigins = [
-  'http://localhost:5173', // Local development
-  'https://apifyn.onrender.com', // Production backend
-  'https://apifyn-frontend.onrender.com', // Production frontend
-  process.env.CLIENT_URL, // Frontend URL from environment
-  process.env.FRONTEND_URL, // Alternative frontend URL env var
-].filter(Boolean); // Remove any undefined values
+const getAllowedOrigins = (): string[] => {
+  const originsEnv = process.env.ALLOWED_ORIGINS;
+  
+  if (!originsEnv) {
+    logger.error('ALLOWED_ORIGINS environment variable is not set');
+    return [];
+  }
+  
+  // Split by comma and trim whitespace
+  return originsEnv
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(origin => origin.length > 0); // Remove empty strings
+};
+
+const allowedOrigins = getAllowedOrigins();
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -138,7 +147,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      logger.warn(`Blocked request from unauthorized origin: ${origin}`);
+      logger.warn(`Blocked request from unauthorized origin: ${origin}. Allowed origins: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
