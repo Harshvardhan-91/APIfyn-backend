@@ -16,7 +16,7 @@ model Plan {
   features       String[]
   apiCallsLimit  Int
   workflowsLimit Int
-  type           SubscriptionTier
+  type           SubscriptionTier @default(STARTER)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   subscriptions  Subscription[]

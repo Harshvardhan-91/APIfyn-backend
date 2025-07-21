@@ -11,8 +11,19 @@ const router = express.Router();
 // Create a new subscription
 router.post('/create', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { planId, interval } = req.body;
+  
+  // Validate planId
+  if (!['starter', 'professional', 'enterprise'].includes(planId.toLowerCase())) {
+    throw new Error('Invalid plan type');
+  }
+  
+  // Validate interval
+  if (!['monthly', 'yearly'].includes(interval)) {
+    throw new Error('Invalid interval. Must be monthly or yearly');
+  }
+  
   try {
-    const subscription = await RazorpayService.createSubscription(req.user.firebaseUid, planId, interval);
+    const subscription = await RazorpayService.createSubscription(req.user.firebaseUid, planId.toLowerCase(), interval);
     res.json({
       success: true,
       subscription,

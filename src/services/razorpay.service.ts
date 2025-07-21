@@ -26,9 +26,7 @@ export class RazorpayService {
         }),
         prisma.plan.findFirst({ 
           where: { 
-            type: planId === 'starter' ? 'STARTER' :
-                  planId === 'professional' ? 'PROFESSIONAL' :
-                  planId === 'enterprise' ? 'ENTERPRISE' : 'STARTER'
+            type: planId.toUpperCase() as SubscriptionTier
           }
         })
       ]);
@@ -115,11 +113,16 @@ export class RazorpayService {
   static async handlePaymentSuccess(paymentId: string, orderId: string, signature: string) {
     try {
       // Verify payment signature
-      const isValid = razorpay.webhooks.verifyPaymentSignature({
+      const body = JSON.stringify({
         payment_id: paymentId,
-        order_id: orderId,
-        signature: signature
+        order_id: orderId
       });
+      
+      const isValid = Razorpay.validateWebhookSignature(
+        body,
+        signature,
+        process.env.RAZORPAY_WEBHOOK_SECRET!
+      );
 
       if (!isValid) {
         throw new Error('Invalid payment signature');
@@ -143,13 +146,22 @@ export class RazorpayService {
           razorpayPaymentId: paymentId,
           razorpayOrderId: orderId,
           razorpaySignature: signature,
-          amount: payment.amount / 100, // Convert from paise to rupees
+          amount: Number(payment.amount) / 100, // Convert from paise to rupees
           currency: payment.currency,
           status: payment.status,
           orderType: 'subscription_charge',
           subscriptionId: subscription.id,
           userId: subscription.userId,
-          metadata: payment
+          metadata: {
+            razorpayPayment: {
+              id: payment.id,
+              entity: payment.entity,
+              amount: payment.amount,
+              currency: payment.currency,
+              status: payment.status,
+              order_id: payment.order_id
+            }
+          }
         }
       });
 
