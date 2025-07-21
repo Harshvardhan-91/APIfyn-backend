@@ -149,7 +149,7 @@ router.get('/usage', authenticateFirebaseToken, asyncHandler(async (req: Authent
       },
     }),
     // Define subscription limits based on tier
-    Promise.resolve(getSubscriptionLimits(user.subscription)),
+    Promise.resolve(getSubscriptionLimits(user.subscription?.plan.type || 'FREE')),
   ]);
 
   res.json({
@@ -172,9 +172,9 @@ router.get('/usage', authenticateFirebaseToken, asyncHandler(async (req: Authent
       },
     },
     subscription: {
-      tier: user.subscription,
-      status: user.subscriptionStatus || 'active',
-      trialEndsAt: user.trialEndsAt,
+      tier: user.subscription?.plan.type || 'FREE',
+      status: user.subscription?.status || 'inactive',
+      currentPeriodEnd: user.subscription?.currentPeriodEnd || null,
     },
   });
 }));

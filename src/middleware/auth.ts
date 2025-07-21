@@ -2,20 +2,27 @@ import { Request, Response, NextFunction } from 'express';
 import admin from 'firebase-admin';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index';
-import { User } from '@prisma/client';
+import { User, Subscription, Plan } from '@prisma/client';
+
+// Define type for user with subscription
+export type UserWithSubscription = User & {
+  subscription: (Subscription & {
+    plan: Plan
+  }) | null
+};
 
 // Extend Express Request interface to include user
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      user?: UserWithSubscription;
       firebaseUser?: admin.auth.DecodedIdToken;
     }
   }
 }
 
 export interface AuthenticatedRequest extends Request {
-  user: User;
+  user: UserWithSubscription;
   firebaseUser: admin.auth.DecodedIdToken;
 }
 
@@ -41,11 +48,18 @@ export const authenticateFirebaseToken = async (
     // Find or create user in database
     let user = await prisma.user.findUnique({
       where: { firebaseUid: decodedToken.uid },
+      include: {
+        subscription: {
+          include: {
+            plan: true
+          }
+        }
+      }
     });
 
     if (!user) {
       // Create new user if doesn't exist
-      user = await prisma.user.create({
+      await prisma.user.create({
         data: {
           firebaseUid: decodedToken.uid,
           email: decodedToken.email || '',
@@ -61,6 +75,24 @@ export const authenticateFirebaseToken = async (
         where: { id: user.id },
         data: { lastLoginAt: new Date() },
       });
+    }
+
+    if (!user) {
+      // Fetch the newly created user with subscription
+      user = await prisma.user.findUnique({
+        where: { firebaseUid: decodedToken.uid },
+        include: {
+          subscription: {
+            include: {
+              plan: true
+            }
+          }
+        }
+      });
+    }
+
+    if (!user) {
+      throw new Error('Failed to create or fetch user');
     }
 
     req.user = user;
@@ -94,7 +126,17 @@ export const authenticateApiKey = async (
     
     const apiKeys = await prisma.apiKey.findMany({
       where: { isActive: true },
-      include: { user: true },
+      include: { 
+        user: {
+          include: {
+            subscription: {
+              include: {
+                plan: true
+              }
+            }
+          }
+        }
+      },
     });
 
     let matchedApiKey = null;
@@ -160,14 +202,15 @@ export const requireSubscription = (minTier: string) => {
       return;
     }
 
-    const userTierIndex = tierOrder.indexOf(req.user.subscription);
+    const userTier = req.user.subscription?.plan.type || 'FREE';
+    const userTierIndex = tierOrder.indexOf(userTier);
     const requiredTierIndex = tierOrder.indexOf(minTier);
 
     if (userTierIndex < requiredTierIndex) {
       res.status(403).json({ 
         error: 'Subscription upgrade required',
         required: minTier,
-        current: req.user.subscription,
+        current: userTier,
       });
       return;
     }

@@ -140,7 +140,7 @@ router.post('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticat
     where: { userId: user.id },
   });
 
-  const limits = getSubscriptionLimits(user.subscription);
+  const limits = getSubscriptionLimits(user.subscription?.plan.type || 'FREE');
   if (workflowCount >= limits.workflows) {
     throw new CustomError('Workflow limit reached for your subscription', 403);
   }
