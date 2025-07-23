@@ -13,7 +13,7 @@ router.post('/create', authenticateFirebaseToken, asyncHandler(async (req: Authe
   const { planId, interval } = req.body;
   
   // Validate planId
-  if (!['starter', 'professional', 'enterprise'].includes(planId.toLowerCase())) {
+  if (!['free', 'pro', 'premium'].includes(planId.toLowerCase())) {
     throw new Error('Invalid plan type');
   }
   

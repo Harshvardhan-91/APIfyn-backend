@@ -16,7 +16,7 @@ model Plan {
   features       String[]
   apiCallsLimit  Int
   workflowsLimit Int
-  type           SubscriptionTier @default(STARTER)
+  type           SubscriptionTier @default(FREE)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   subscriptions  Subscription[]
@@ -221,9 +221,8 @@ enum UserRole {
 
 enum SubscriptionTier {
   FREE
-  STARTER
-  PROFESSIONAL
-  ENTERPRISE
+  PRO
+  PREMIUM
 }
 
 enum TriggerType {

@@ -12,6 +12,16 @@ const logger = createLogger();
 router.get('/dashboard', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
 
+  // Get user with subscription and plan information
+  const userWithPlan = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: {
+      subscription: {
+        include: { plan: true }
+      }
+    }
+  });
+
   // Get dashboard statistics
   const [
     totalWorkflows,
@@ -77,6 +87,16 @@ router.get('/dashboard', authenticateFirebaseToken, asyncHandler(async (req: Aut
         successRate: recentExecutions.length > 0 
           ? (recentExecutions.filter(e => e.status === 'SUCCESS').length / recentExecutions.length) * 100 
           : 0,
+      },
+      plan: {
+        type: userWithPlan?.subscription?.plan?.type || 'FREE',
+        name: userWithPlan?.subscription?.plan?.name || 'Free',
+        workflowsLimit: userWithPlan?.subscription?.plan?.workflowsLimit || 2,
+        apiCallsLimit: userWithPlan?.subscription?.plan?.apiCallsLimit || 100,
+        workflowsUsed: totalWorkflows,
+        apiCallsUsed: userWithPlan?.apiCallsUsed || 0,
+        subscriptionStatus: userWithPlan?.subscription?.status || 'inactive',
+        subscriptionEndDate: userWithPlan?.subscription?.currentPeriodEnd || null,
       },
     },
   });

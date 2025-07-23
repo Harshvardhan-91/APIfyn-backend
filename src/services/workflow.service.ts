@@ -28,10 +28,10 @@ export class WorkflowService {
 
       // Determine workflow limit based on plan
       let workflowLimit = parseInt(process.env.FREE_PLAN_WORKFLOWS || '2');
-      if (user.subscription?.plan?.type === 'PROFESSIONAL') {
+      if (user.subscription?.plan?.type === 'PRO') {
         workflowLimit = parseInt(process.env.PRO_PLAN_WORKFLOWS || '50');
-      } else if (user.subscription?.plan?.type === 'ENTERPRISE') {
-        workflowLimit = parseInt(process.env.PREMIUM_PLAN_WORKFLOWS || '200');
+      } else if (user.subscription?.plan?.type === 'PREMIUM') {
+        workflowLimit = parseInt(process.env.PREMIUM_PLAN_WORKFLOWS || '999999');
       }
 
       if (currentWorkflowCount >= workflowLimit) {
@@ -179,11 +179,11 @@ export class WorkflowService {
       });
 
       // Determine execution limit based on plan
-      let executionLimit = parseInt(process.env.FREE_PLAN_EXECUTIONS || '100');
-      if (workflow.user.subscription?.plan?.type === 'PROFESSIONAL') {
-        executionLimit = parseInt(process.env.PRO_PLAN_EXECUTIONS || '10000');
-      } else if (workflow.user.subscription?.plan?.type === 'ENTERPRISE') {
-        executionLimit = parseInt(process.env.PREMIUM_PLAN_EXECUTIONS || '100000');
+      let executionLimit = parseInt(process.env.FREE_PLAN_API_CALLS || '100');
+      if (workflow.user.subscription?.plan?.type === 'PRO') {
+        executionLimit = parseInt(process.env.PRO_PLAN_API_CALLS || '10000');
+      } else if (workflow.user.subscription?.plan?.type === 'PREMIUM') {
+        executionLimit = parseInt(process.env.PREMIUM_PLAN_API_CALLS || '999999');
       }
 
       if (monthlyExecutions >= executionLimit && executionMode !== 'TEST') {
