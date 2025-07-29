@@ -258,4 +258,224 @@ async function testIntegrationConnection(integration: any) {
   }
 }
 
+// Get integration status for specific types
+router.get('/status', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  
+  const integrations = await prisma.integration.findMany({
+    where: { 
+      userId: user.id,
+      isActive: true 
+    },
+    select: {
+      type: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+  
+  // Create status map
+  const statusMap: Record<string, string> = {};
+  integrations.forEach(integration => {
+    statusMap[integration.type.toLowerCase()] = 'connected';
+  });
+  
+  res.json({
+    success: true,
+    integrations: statusMap,
+  });
+}));
+
+// OAuth Authorization Routes
+router.get('/oauth/:provider/authorize', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { provider } = req.params;
+  const user = req.user;
+  
+  let authUrl = '';
+  let redirectUri = '';
+  
+  switch (provider.toLowerCase()) {
+    case 'gmail':
+      redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/gmail/callback';
+      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${process.env.GMAIL_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send')}&` +
+        `access_type=offline&` +
+        `state=${user.id}`;
+      break;
+      
+    case 'slack':
+      redirectUri = process.env.SLACK_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/slack/callback';
+      authUrl = `https://slack.com/oauth/v2/authorize?` +
+        `client_id=${process.env.SLACK_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `scope=${encodeURIComponent('channels:read,chat:write,users:read')}&` +
+        `state=${user.id}`;
+      break;
+      
+    case 'notion':
+      redirectUri = process.env.NOTION_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/notion/callback';
+      authUrl = `https://api.notion.com/v1/oauth/authorize?` +
+        `client_id=${process.env.NOTION_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `owner=user&` +
+        `state=${user.id}`;
+      break;
+      
+    case 'discord':
+      redirectUri = process.env.DISCORD_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/discord/callback';
+      authUrl = `https://discord.com/api/oauth2/authorize?` +
+        `client_id=${process.env.DISCORD_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent('bot webhook.incoming')}&` +
+        `state=${user.id}`;
+      break;
+      
+    default:
+      throw new CustomError('Unsupported OAuth provider', 400);
+  }
+  
+  res.json({
+    success: true,
+    authUrl: authUrl,
+    provider: provider,
+    message: 'Redirect user to this URL for authorization'
+  });
+}));
+
+// OAuth Callback Routes
+router.get('/oauth/:provider/callback', asyncHandler(async (req: Request, res: Response) => {
+  const { provider } = req.params;
+  const { code, state } = req.query;
+  
+  if (!code || !state) {
+    throw new CustomError('Missing authorization code or state', 400);
+  }
+  
+  try {
+    let tokenResponse: any = {};
+    let redirectUri = '';
+    
+    switch (provider.toLowerCase()) {
+      case 'gmail':
+        redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/gmail/callback';
+        tokenResponse = await exchangeCodeForToken('gmail', code as string, redirectUri);
+        break;
+        
+      case 'slack':
+        redirectUri = process.env.SLACK_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/slack/callback';
+        tokenResponse = await exchangeCodeForToken('slack', code as string, redirectUri);
+        break;
+        
+      case 'notion':
+        redirectUri = process.env.NOTION_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/notion/callback';
+        tokenResponse = await exchangeCodeForToken('notion', code as string, redirectUri);
+        break;
+        
+      case 'discord':
+        redirectUri = process.env.DISCORD_REDIRECT_URI || 'http://localhost:5000/api/integration/oauth/discord/callback';
+        tokenResponse = await exchangeCodeForToken('discord', code as string, redirectUri);
+        break;
+        
+      default:
+        throw new CustomError('Unsupported OAuth provider', 400);
+    }
+    
+    // Save integration to database
+    await prisma.integration.create({
+      data: {
+        userId: state as string,
+        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Integration`,
+        type: provider.toUpperCase(),
+        config: {
+          accessToken: tokenResponse.access_token,
+          refreshToken: tokenResponse.refresh_token,
+          expiresAt: tokenResponse.expires_in ? new Date(Date.now() + tokenResponse.expires_in * 1000) : null,
+        },
+        isActive: true,
+      },
+    });
+    
+    // Redirect to frontend with success
+    res.redirect(`${process.env.FRONTEND_URL}/workflows?integration=${provider}&status=success`);
+    
+  } catch (error) {
+    logger.error(`OAuth callback error for ${provider}:`, error);
+    res.redirect(`${process.env.FRONTEND_URL}/workflows?integration=${provider}&status=error`);
+  }
+}));
+
+// Helper function to exchange code for token
+async function exchangeCodeForToken(provider: string, code: string, redirectUri: string) {
+  const fetch = (await import('node-fetch')).default;
+  
+  let tokenUrl = '';
+  let requestBody: any = {};
+  
+  switch (provider) {
+    case 'gmail':
+      tokenUrl = 'https://oauth2.googleapis.com/token';
+      requestBody = {
+        client_id: process.env.GMAIL_CLIENT_ID,
+        client_secret: process.env.GMAIL_CLIENT_SECRET,
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+      };
+      break;
+      
+    case 'slack':
+      tokenUrl = 'https://slack.com/api/oauth.v2.access';
+      requestBody = {
+        client_id: process.env.SLACK_CLIENT_ID,
+        client_secret: process.env.SLACK_CLIENT_SECRET,
+        code: code,
+        redirect_uri: redirectUri,
+      };
+      break;
+      
+    case 'notion':
+      tokenUrl = 'https://api.notion.com/v1/oauth/token';
+      requestBody = {
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: redirectUri,
+      };
+      break;
+      
+    case 'discord':
+      tokenUrl = 'https://discord.com/api/oauth2/token';
+      requestBody = {
+        client_id: process.env.DISCORD_CLIENT_ID,
+        client_secret: process.env.DISCORD_CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: redirectUri,
+      };
+      break;
+  }
+  
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...(provider === 'notion' ? {
+        'Authorization': `Basic ${Buffer.from(`${process.env.NOTION_CLIENT_ID}:${process.env.NOTION_CLIENT_SECRET}`).toString('base64')}`,
+        'Notion-Version': '2022-06-28'
+      } : {})
+    },
+    body: new URLSearchParams(requestBody).toString(),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Token exchange failed: ${response.statusText}`);
+  }
+  
+  return await response.json();
+}
+
 export default router;
