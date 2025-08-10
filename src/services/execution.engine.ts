@@ -294,7 +294,7 @@ export class ExecutionEngine {
       throw new Error('Workflow not found');
     }
 
-    const definition = workflow.definition as WorkflowDefinition;
+    const definition = workflow.definition as unknown as WorkflowDefinition;
     if (!definition || !definition.steps) {
       throw new Error('Invalid workflow definition');
     }

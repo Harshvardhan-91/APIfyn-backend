@@ -3,9 +3,20 @@ import { authenticateFirebaseToken, AuthenticatedRequest } from '../middleware/a
 import { asyncHandler, CustomError } from '../middleware/errorHandler';
 import { prisma } from '../index';
 import { createLogger } from '../utils/logger';
+import { IntegrationType } from '@prisma/client';
+import fetch from 'node-fetch';
 
 const router = express.Router();
 const logger = createLogger();
+
+// Helper function to convert provider string to IntegrationType
+function getIntegrationType(provider: string): IntegrationType {
+  const providerUpper = provider.toUpperCase();
+  if (Object.values(IntegrationType).includes(providerUpper as IntegrationType)) {
+    return providerUpper as IntegrationType;
+  }
+  throw new CustomError(`Unsupported integration type: ${provider}`, 400);
+}
 
 // Get all integrations for user
 router.get('/', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -291,6 +302,10 @@ router.get('/oauth/:provider/authorize', authenticateFirebaseToken, asyncHandler
   const { provider } = req.params;
   const user = req.user;
   
+  if (!provider) {
+    throw new CustomError('Provider parameter is required', 400);
+  }
+  
   let authUrl = '';
   let redirectUri = '';
   
@@ -352,6 +367,10 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req: Request, res: R
   const { provider } = req.params;
   const { code, state } = req.query;
   
+  if (!provider) {
+    throw new CustomError('Provider parameter is required', 400);
+  }
+  
   if (!code || !state) {
     throw new CustomError('Missing authorization code or state', 400);
   }
@@ -390,7 +409,7 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req: Request, res: R
       data: {
         userId: state as string,
         name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Integration`,
-        type: provider.toUpperCase(),
+        type: getIntegrationType(provider),
         config: {
           accessToken: tokenResponse.access_token,
           refreshToken: tokenResponse.refresh_token,
@@ -411,8 +430,6 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req: Request, res: R
 
 // Helper function to exchange code for token
 async function exchangeCodeForToken(provider: string, code: string, redirectUri: string) {
-  const fetch = (await import('node-fetch')).default;
-  
   let tokenUrl = '';
   let requestBody: any = {};
   

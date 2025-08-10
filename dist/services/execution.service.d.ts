@@ -1,0 +1,90 @@
+export declare class ExecutionService {
+    static logExecution(data: {
+        workflowId: string;
+        userId: string;
+        inputData: any;
+        outputData?: any;
+        status: string;
+        errorMessage?: string;
+        errorStack?: string;
+        startedAt?: Date;
+        completedAt?: Date;
+        duration?: number;
+    }): Promise<{
+        id: string;
+        createdAt: Date;
+        status: import(".prisma/client").$Enums.ExecutionStatus;
+        userId: string;
+        startedAt: Date;
+        completedAt: Date | null;
+        duration: number | null;
+        inputData: import("@prisma/client/runtime/library").JsonValue | null;
+        outputData: import("@prisma/client/runtime/library").JsonValue | null;
+        errorMessage: string | null;
+        errorStack: string | null;
+        stepsExecuted: import("@prisma/client/runtime/library").JsonValue[];
+        currentStep: number | null;
+        totalSteps: number | null;
+        triggerSource: string | null;
+        executionMode: import(".prisma/client").$Enums.ExecutionMode;
+        workflowId: string;
+    }>;
+    static getWorkflowExecutions(workflowId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        status: import(".prisma/client").$Enums.ExecutionStatus;
+        userId: string;
+        startedAt: Date;
+        completedAt: Date | null;
+        duration: number | null;
+        inputData: import("@prisma/client/runtime/library").JsonValue | null;
+        outputData: import("@prisma/client/runtime/library").JsonValue | null;
+        errorMessage: string | null;
+        errorStack: string | null;
+        stepsExecuted: import("@prisma/client/runtime/library").JsonValue[];
+        currentStep: number | null;
+        totalSteps: number | null;
+        triggerSource: string | null;
+        executionMode: import(".prisma/client").$Enums.ExecutionMode;
+        workflowId: string;
+    }[]>;
+    static getExecution(id: string): Promise<{
+        id: string;
+        createdAt: Date;
+        status: import(".prisma/client").$Enums.ExecutionStatus;
+        userId: string;
+        startedAt: Date;
+        completedAt: Date | null;
+        duration: number | null;
+        inputData: import("@prisma/client/runtime/library").JsonValue | null;
+        outputData: import("@prisma/client/runtime/library").JsonValue | null;
+        errorMessage: string | null;
+        errorStack: string | null;
+        stepsExecuted: import("@prisma/client/runtime/library").JsonValue[];
+        currentStep: number | null;
+        totalSteps: number | null;
+        triggerSource: string | null;
+        executionMode: import(".prisma/client").$Enums.ExecutionMode;
+        workflowId: string;
+    } | null>;
+    static retryExecution(id: string): Promise<{
+        id: string;
+        createdAt: Date;
+        status: import(".prisma/client").$Enums.ExecutionStatus;
+        userId: string;
+        startedAt: Date;
+        completedAt: Date | null;
+        duration: number | null;
+        inputData: import("@prisma/client/runtime/library").JsonValue | null;
+        outputData: import("@prisma/client/runtime/library").JsonValue | null;
+        errorMessage: string | null;
+        errorStack: string | null;
+        stepsExecuted: import("@prisma/client/runtime/library").JsonValue[];
+        currentStep: number | null;
+        totalSteps: number | null;
+        triggerSource: string | null;
+        executionMode: import(".prisma/client").$Enums.ExecutionMode;
+        workflowId: string;
+    }>;
+}
+//# sourceMappingURL=execution.service.d.ts.map
