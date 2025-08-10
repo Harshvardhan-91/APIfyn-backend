@@ -14,6 +14,7 @@ import userRoutes from './routes/user';
 import workflowRoutes from './routes/workflow';
 import integrationRoutes from './routes/integration';
 import subscriptionRoutes from './routes/subscription';
+import webhookRoutes from './routes/webhook';
 
 // Load environment variables
 dotenv.config();
@@ -193,6 +194,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/integration', integrationRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/webhook', webhookRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {

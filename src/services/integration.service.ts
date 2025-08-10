@@ -96,6 +96,10 @@ export class IntegrationService {
   }
 
   // Google Sheets Integration
+  static async addGoogleSheetsRow(accessToken: string, spreadsheetId: string, range: string, values: string[]) {
+    return this.addRowToSheet(accessToken, spreadsheetId, range, [values]);
+  }
+
   static async addRowToSheet(accessToken: string, spreadsheetId: string, range: string, values: any[][]) {
     try {
       const response = await fetch(

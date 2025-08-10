@@ -2,6 +2,7 @@ import { prisma } from '../index';
 import { Workflow, WorkflowExecution } from '@prisma/client';
 import { createLogger } from '../utils/logger';
 import { ExecutionService } from './execution.service';
+import { ExecutionEngine } from './execution.engine';
 
 const logger = createLogger();
 
@@ -190,81 +191,15 @@ export class WorkflowService {
         throw new Error(`Monthly execution limit reached. Upgrade your plan for more executions.`);
       }
 
-      // Create execution record
-      const execution = await prisma.workflowExecution.create({
-        data: {
-          status: 'RUNNING',
-          inputData: triggerData,
-          executionMode,
-          triggerSource: 'MANUAL',
-          workflowId,
-          userId: workflow.userId,
-        }
-      });
-
-      // Simulate workflow execution for now (will be replaced with real execution engine)
-      const startTime = Date.now();
-      let success = true;
-      let error = null;
-      let output: any = { result: 'Workflow executed successfully', data: triggerData };
-
-      try {
-        // TODO: Implement real workflow execution logic here
-        // For now, simulate a delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } catch (executionError: any) {
-        success = false;
-        error = executionError.message;
-        output = { result: 'Execution failed', data: triggerData };
-      }
-
-      const duration = (Date.now() - startTime) / 1000;
-
-      // Update execution with results
-      await prisma.workflowExecution.update({
-        where: { id: execution.id },
-        data: {
-          status: success ? 'SUCCESS' : 'FAILED',
-          completedAt: new Date(),
-          duration,
-          outputData: output,
-          errorMessage: error,
-        }
-      });
-
-      // Update workflow statistics
-      if (success) {
-        await prisma.workflow.update({
-          where: { id: workflowId },
-          data: {
-            totalRuns: { increment: 1 },
-            successfulRuns: { increment: 1 },
-            lastExecutedAt: new Date(),
-          }
-        });
-      } else {
-        await prisma.workflow.update({
-          where: { id: workflowId },
-          data: {
-            totalRuns: { increment: 1 },
-            failedRuns: { increment: 1 },
-            lastExecutedAt: new Date(),
-          }
-        });
-      }
+      // Use the new execution engine
+      const result = await ExecutionEngine.executeWorkflow(workflowId, triggerData, executionMode);
 
       logger.info('Workflow execution completed', { 
-        executionId: execution.id, 
-        success 
+        executionId: result.executionId, 
+        success: result.success 
       });
 
-      return {
-        executionId: execution.id,
-        success,
-        output,
-        error,
-        duration
-      };
+      return result;
     } catch (error) {
       logger.error('Error executing workflow:', error);
       throw error;
