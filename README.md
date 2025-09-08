@@ -6,7 +6,7 @@ APIfyn is a next-generation API automation platform, empowering developers and b
 
 ---
 
-## 🚀 What Am I Building?
+## What Am I Building?
 
 The APIfyn backend is a secure, scalable, and extensible API service built with modern technologies:
 
@@ -32,7 +32,7 @@ The APIfyn backend is a secure, scalable, and extensible API service built with 
 
 ---
 
-## 🛠️ Technologies Used
+## Technologies Used
 
 - **Node.js & Express** – Fast, scalable backend framework
 - **TypeScript** – Type-safe development for reliability
@@ -43,7 +43,7 @@ The APIfyn backend is a secure, scalable, and extensible API service built with 
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
