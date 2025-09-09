@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { authenticateFirebaseToken, AuthenticatedRequest, requireRole } from '../middleware/auth';
 import { asyncHandler, CustomError } from '../middleware/errorHandler';
-import { prisma } from '../index';
+import { prisma } from '../db';
 import bcrypt from 'bcryptjs';
 import { createLogger } from '../utils/logger';
 

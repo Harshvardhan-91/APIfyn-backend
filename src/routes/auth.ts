@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import admin from 'firebase-admin';
 import { authenticateFirebaseToken, AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler, CustomError } from '../middleware/errorHandler';
-import { prisma } from '../index';
+import { prisma } from '../db';
 import { createLogger } from '../utils/logger';
 
 const router = express.Router();
@@ -61,35 +61,6 @@ router.post('/verify', asyncHandler(async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Token verification failed:', error);
-    
-    if (process.env.NODE_ENV === 'development') {
-      // In development, create a mock user for testing
-      const mockUser = {
-        id: 'dev-user-id',
-        email: 'dev@example.com',
-        displayName: 'Development User',
-        photoURL: null,
-        emailVerified: true,
-        role: 'USER' as const,
-        subscription: 'FREE' as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      logger.warn('Development mode: Using mock user');
-      res.json({
-        success: true,
-        user: mockUser,
-        firebase: {
-          uid: 'dev-uid',
-          email: 'dev@example.com',
-          emailVerified: true,
-        },
-        development: true,
-      });
-      return;
-    }
-    
     throw new CustomError('Invalid or expired token', 401);
   }
 }));

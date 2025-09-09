@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticateFirebaseToken } from '../middleware/auth';
-import { prisma } from '../index';
+import { prisma } from '../db';
 
 const router = express.Router();
 

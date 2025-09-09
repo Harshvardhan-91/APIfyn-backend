@@ -1,4 +1,4 @@
-import { prisma } from '../index';
+import { prisma } from '../db';
 
 export class DashboardService {
   // Get basic user stats (placeholder for future implementation)

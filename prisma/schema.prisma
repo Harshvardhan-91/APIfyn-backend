@@ -8,59 +8,18 @@ datasource db {
 }
 
 model Plan {
-  id             String           @id @default(cuid())
-  name           String           @unique
+  id             String        @id @default(cuid())
+  name           String        @unique
   description    String
   monthlyPrice   Float
   yearlyPrice    Float
   features       String[]
   apiCallsLimit  Int
   workflowsLimit Int
-  type           SubscriptionTier @default(FREE)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  subscriptions  Subscription[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@map("plans")
-}
-
-model Subscription {
-  id                 String    @id @default(cuid())
-  razorpaySubId      String?   @unique
-  status             String
-  currentPeriodStart DateTime
-  currentPeriodEnd   DateTime
-  cancelAtPeriodEnd  Boolean   @default(false)
-  interval           String
-  intervalCount      Int       @default(1)
-  planId             String
-  userId             String    @unique
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  payments           Payment[]
-  plan               Plan      @relation(fields: [planId], references: [id])
-  user               User      @relation(fields: [userId], references: [id])
-
-  @@map("subscriptions")
-}
-
-model Payment {
-  id                String       @id @default(cuid())
-  razorpayPaymentId String       @unique
-  amount            Float
-  currency          String       @default("INR")
-  status            String
-  orderType         String
-  razorpayOrderId   String?
-  razorpaySignature String?
-  subscriptionId    String
-  userId            String
-  createdAt         DateTime     @default(now())
-  metadata          Json?
-  subscription      Subscription @relation(fields: [subscriptionId], references: [id])
-  user              User         @relation(fields: [userId], references: [id])
-
-  @@map("payments")
 }
 
 model User {
@@ -80,8 +39,6 @@ model User {
   updatedAt     DateTime            @updatedAt
   lastLoginAt   DateTime?
   integrations  Integration[]
-  payments      Payment[]
-  subscription  Subscription?
   executions    WorkflowExecution[]
   workflows     Workflow[]
 
