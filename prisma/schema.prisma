@@ -70,7 +70,6 @@ model User {
   displayName   String?
   photoURL      String?
   emailVerified Boolean             @default(false)
-  role          UserRole            @default(USER)
   firstName     String?
   lastName      String?
   company       String?
@@ -80,9 +79,7 @@ model User {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   lastLoginAt   DateTime?
-  apiKeys       ApiKey[]
   integrations  Integration[]
-  notifications Notification[]
   payments      Payment[]
   subscription  Subscription?
   executions    WorkflowExecution[]
@@ -91,33 +88,33 @@ model User {
   @@map("users")
 }
 
-model Workflow {
-  id               String              @id @default(cuid())
-  name             String
-  description      String?
-  definition       Json
-  isActive         Boolean             @default(true)
-  isPublic         Boolean             @default(false)
-  category         String?
-  tags             String[]
-  version          Int                 @default(1)
-  triggerType      TriggerType
-  triggerConfig    Json?
-  timeout          Int                 @default(300)
-  retryAttempts    Int                 @default(3)
-  totalRuns        Int                 @default(0)
-  successfulRuns   Int                 @default(0)
-  failedRuns       Int                 @default(0)
-  lastExecutedAt   DateTime?
-  avgExecutionTime Float?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  userId           String
-  executions       WorkflowExecution[]
-  schedules        WorkflowSchedule[]
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Integration {
+  id             String          @id @default(cuid())
+  name           String          // e.g. "My GitHub Repo" or "Slack Workspace"
+  type           IntegrationType // GITHUB / SLACK
+  config         Json            // stores repo/channel IDs, webhook secret etc.
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  @@map("workflows")
+model Workflow {
+  id             String              @id @default(cuid())
+  name           String
+  description    String?
+  triggerType    TriggerType         // WEBHOOK for GitHub push
+  triggerConfig  Json                // e.g. repo, eventType (push, PR)
+  actionConfig   Json                // e.g. Slack channel, message template
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  userId         String
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions     WorkflowExecution[]
 }
 
 model WorkflowExecution {
@@ -125,114 +122,18 @@ model WorkflowExecution {
   status        ExecutionStatus
   startedAt     DateTime        @default(now())
   completedAt   DateTime?
-  duration      Float?
   inputData     Json?
   outputData    Json?
   errorMessage  String?
-  errorStack    String?
-  stepsExecuted Json[]
-  currentStep   Int?
-  totalSteps    Int?
-  triggerSource String?
-  executionMode ExecutionMode   @default(NORMAL)
-  createdAt     DateTime        @default(now())
   workflowId    String
   userId        String
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   workflow      Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-
-  @@map("workflow_executions")
-}
-
-model Integration {
-  id             String          @id @default(cuid())
-  name           String
-  type           IntegrationType
-  config         Json
-  isActive       Boolean         @default(true)
-  accessToken    String?
-  refreshToken   String?
-  tokenExpiresAt DateTime?
-  totalCalls     Int             @default(0)
-  lastUsedAt     DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  userId         String
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("integrations")
-}
-
-model WorkflowSchedule {
-  id             String    @id @default(cuid())
-  cronExpression String
-  timezone       String    @default("UTC")
-  isActive       Boolean   @default(true)
-  nextRunAt      DateTime?
-  lastRunAt      DateTime?
-  runCount       Int       @default(0)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  workflowId     String
-  workflow       Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-
-  @@map("workflow_schedules")
-}
-
-model Notification {
-  id        String           @id @default(cuid())
-  title     String
-  message   String
-  type      NotificationType
-  isRead    Boolean          @default(false)
-  metadata  Json?
-  actionUrl String?
-  createdAt DateTime         @default(now())
-  readAt    DateTime?
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notifications")
-}
-
-model ApiKey {
-  id            String    @id @default(cuid())
-  name          String
-  keyHash       String    @unique
-  keyPreview    String
-  permissions   String[]
-  lastUsedAt    DateTime?
-  totalRequests Int       @default(0)
-  rateLimit     Int?
-  expiresAt     DateTime?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("api_keys")
-}
-
-enum UserRole {
-  USER
-  ADMIN
-  SUPER_ADMIN
-}
-
-enum SubscriptionTier {
-  FREE
-  PRO
-  PREMIUM
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum TriggerType {
-  MANUAL
   WEBHOOK
-  SCHEDULE
-  EMAIL
-  API_CALL
-  FILE_UPLOAD
-  DATABASE_CHANGE
+  MANUAL
 }
 
 enum ExecutionStatus {
@@ -240,47 +141,9 @@ enum ExecutionStatus {
   RUNNING
   SUCCESS
   FAILED
-  CANCELLED
-  TIMEOUT
-}
-
-enum ExecutionMode {
-  NORMAL
-  TEST
-  DEBUG
 }
 
 enum IntegrationType {
-  GMAIL
+  GITHUB
   SLACK
-  NOTION
-  DISCORD
-  GOOGLE_SHEETS
-  AIRTABLE
-  SALESFORCE
-  HUBSPOT
-  WEBHOOK
-  REST_API
-  GRAPHQL
-  DATABASE
-  FTP
-  SFTP
-  AWS_S3
-  DROPBOX
-  GOOGLE_DRIVE
-  CUSTOM
-}
-
-enum NotificationType {
-  INFO
-  SUCCESS
-  WARNING
-  ERROR
-  WORKFLOW_COMPLETE
-  WORKFLOW_FAILED
-  INTEGRATION_CONNECTED
-  INTEGRATION_DISCONNECTED
-  SUBSCRIPTION_UPDATED
-  QUOTA_WARNING
-  QUOTA_EXCEEDED
 }
