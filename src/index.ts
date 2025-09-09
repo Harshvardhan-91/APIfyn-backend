@@ -13,7 +13,6 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import workflowRoutes from './routes/workflow';
 import integrationRoutes from './routes/integration';
-import subscriptionRoutes from './routes/subscription';
 import notificationRoutes from './routes/notification';
 import { prisma } from './db';
 
@@ -184,7 +183,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/integration', integrationRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
