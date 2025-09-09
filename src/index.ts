@@ -15,22 +15,13 @@ import workflowRoutes from './routes/workflow';
 import integrationRoutes from './routes/integration';
 import subscriptionRoutes from './routes/subscription';
 import notificationRoutes from './routes/notification';
+import { prisma } from './db';
 
 // Load environment variables
 dotenv.config();
 
 // Initialize logger
 const logger = createLogger();
-
-// Initialize Prisma Client
-export const prisma = new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
-  datasources: {
-    db: {
-      url: getDatabaseUrl(),
-    },
-  },
-});
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
