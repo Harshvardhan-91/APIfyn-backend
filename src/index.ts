@@ -9,10 +9,12 @@ import { PrismaClient } from '@prisma/client';
 import { createLogger } from './utils/logger';
 import { getDatabaseUrl } from './utils/env';
 import { errorHandler } from './middleware/errorHandler';
+// Import routes
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import workflowRoutes from './routes/workflow';
 import integrationRoutes from './routes/integration';
+import webhookRoutes from './routes/webhook';
 import notificationRoutes from './routes/notification';
 import { prisma } from './db';
 
@@ -179,10 +181,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // API Routes
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/workflow', workflowRoutes);
-app.use('/api/integration', integrationRoutes);
+app.use('/api/integrations', integrationRoutes); // Fixed: was '/api/integration'
+app.use('/api/webhooks', webhookRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint

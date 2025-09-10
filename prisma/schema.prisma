@@ -57,21 +57,30 @@ model Integration {
   updatedAt      DateTime        @updatedAt
   userId         String
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("integrations")
 }
 
 model Workflow {
   id             String              @id @default(cuid())
   name           String
   description    String?
-  triggerType    TriggerType         // WEBHOOK for GitHub push
-  triggerConfig  Json                // e.g. repo, eventType (push, PR)
-  actionConfig   Json                // e.g. Slack channel, message template
+  definition     Json                // Workflow definition (blocks, connections, etc.)
   isActive       Boolean             @default(true)
+  isPublic       Boolean             @default(false)
+  triggerType    TriggerType         // WEBHOOK for GitHub push
+  status         WorkflowStatus      @default(DRAFT)
+  category       String?
+  tags           String[]
+  totalRuns      Int                 @default(0)
+  lastRunAt      DateTime?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   userId         String
   user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   executions     WorkflowExecution[]
+
+  @@map("workflows")
 }
 
 model WorkflowExecution {
@@ -79,18 +88,29 @@ model WorkflowExecution {
   status        ExecutionStatus
   startedAt     DateTime        @default(now())
   completedAt   DateTime?
-  inputData     Json?
-  outputData    Json?
-  errorMessage  String?
+  inputData     Json?           @map("input")
+  outputData    Json?           @map("output")
+  errorMessage  String?         @map("error")
+  duration      Int?
   workflowId    String
   userId        String
   workflow      Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_executions")
 }
 
 enum TriggerType {
   WEBHOOK
   MANUAL
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
 }
 
 enum ExecutionStatus {
@@ -101,6 +121,23 @@ enum ExecutionStatus {
 }
 
 enum IntegrationType {
-  GITHUB
+  GMAIL
   SLACK
+  NOTION
+  DISCORD
+  GOOGLE_SHEETS
+  AIRTABLE
+  SALESFORCE
+  HUBSPOT
+  WEBHOOK
+  REST_API
+  GRAPHQL
+  DATABASE
+  FTP
+  SFTP
+  AWS_S3
+  DROPBOX
+  GOOGLE_DRIVE
+  CUSTOM
+  GITHUB
 }
