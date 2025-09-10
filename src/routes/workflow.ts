@@ -36,7 +36,7 @@ router.post('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticat
 
     logger.info(`Workflow created successfully: ${workflow.id} for user ${user.id}`);
 
-    res.json({
+    return res.json({
       success: true,
       workflow: {
         id: workflow.id,
@@ -53,7 +53,7 @@ router.post('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticat
     });
   } catch (error) {
     logger.error('Error creating workflow:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to save workflow'
     });
@@ -74,7 +74,7 @@ router.get('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticate
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       workflows: workflows.map(workflow => ({
         id: workflow.id,
@@ -90,7 +90,7 @@ router.get('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticate
     });
   } catch (error) {
     logger.error('Error fetching workflows:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch workflows'
     });
