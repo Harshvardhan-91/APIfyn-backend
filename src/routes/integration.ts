@@ -96,7 +96,7 @@ router.get('/github/callback', asyncHandler(async (req: Request, res: Response) 
     await OAuthService.saveGitHubIntegration(user.id, tokenData, userData);
 
     // Close the popup window and refresh parent
-    res.send(`
+    return res.send(`
       <script>
         window.opener.postMessage({ type: 'github_auth_success' }, '*');
         window.close();
@@ -104,7 +104,7 @@ router.get('/github/callback', asyncHandler(async (req: Request, res: Response) 
     `);
   } catch (error) {
     logger.error('GitHub OAuth callback error:', error);
-    res.send(`
+    return res.send(`
       <script>
         window.opener.postMessage({ type: 'github_auth_error', error: '${error instanceof Error ? error.message : 'Unknown error'}' }, '*');
         window.close();
@@ -133,13 +133,13 @@ router.get('/github/repositories', authenticateFirebaseToken, asyncHandler(async
 
     const repositories = await OAuthService.getGitHubRepositories(integration.accessToken);
 
-    res.json({
+    return res.json({
       success: true,
       repositories
     });
   } catch (error) {
     logger.error('Error fetching GitHub repositories:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch repositories'
     });
@@ -192,7 +192,7 @@ router.get('/slack/callback', asyncHandler(async (req: Request, res: Response) =
     await OAuthService.saveSlackIntegration(user.id, tokenData);
 
     // Close the popup window and refresh parent
-    res.send(`
+    return res.send(`
       <script>
         window.opener.postMessage({ type: 'slack_auth_success' }, '*');
         window.close();
@@ -200,7 +200,7 @@ router.get('/slack/callback', asyncHandler(async (req: Request, res: Response) =
     `);
   } catch (error) {
     logger.error('Slack OAuth callback error:', error);
-    res.send(`
+    return res.send(`
       <script>
         window.opener.postMessage({ type: 'slack_auth_error', error: '${error instanceof Error ? error.message : 'Unknown error'}' }, '*');
         window.close();
@@ -229,13 +229,13 @@ router.get('/slack/channels', authenticateFirebaseToken, asyncHandler(async (req
 
     const channels = await OAuthService.getSlackChannels(integration.accessToken);
 
-    res.json({
+    return res.json({
       success: true,
       channels
     });
   } catch (error) {
     logger.error('Error fetching Slack channels:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch channels'
     });

@@ -11,6 +11,10 @@ router.post('/github/:workflowId', asyncHandler(async (req: Request, res: Respon
   const { workflowId } = req.params;
   const payload = req.body;
 
+  if (!workflowId) {
+    return res.status(400).json({ error: 'Workflow ID is required' });
+  }
+
   // Verify GitHub webhook signature (optional but recommended)
   // const signature = req.headers['x-hub-signature-256'];
   // if (!verifyGitHubSignature(payload, signature)) {
@@ -22,13 +26,13 @@ router.post('/github/:workflowId', asyncHandler(async (req: Request, res: Respon
     
     await WebhookService.processGitHubWebhook(workflowId, payload);
     
-    res.status(200).json({ 
+    return res.status(200).json({ 
       success: true, 
       message: 'Webhook processed successfully' 
     });
   } catch (error) {
     logger.error(`Error processing GitHub webhook for workflow ${workflowId}:`, error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       message: 'Failed to process webhook',
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -39,6 +43,10 @@ router.post('/github/:workflowId', asyncHandler(async (req: Request, res: Respon
 // Test webhook endpoint for development
 router.post('/test/:workflowId', asyncHandler(async (req: Request, res: Response) => {
   const { workflowId } = req.params;
+  
+  if (!workflowId) {
+    return res.status(400).json({ error: 'Workflow ID is required' });
+  }
   
   // Mock GitHub webhook payload for testing
   const testPayload = {
@@ -74,14 +82,14 @@ router.post('/test/:workflowId', asyncHandler(async (req: Request, res: Response
     
     await WebhookService.processGitHubWebhook(workflowId, testPayload);
     
-    res.status(200).json({ 
+    return res.status(200).json({ 
       success: true, 
       message: 'Test webhook processed successfully',
       payload: testPayload
     });
   } catch (error) {
     logger.error(`Error processing test webhook for workflow ${workflowId}:`, error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       message: 'Failed to process test webhook',
       error: error instanceof Error ? error.message : 'Unknown error'

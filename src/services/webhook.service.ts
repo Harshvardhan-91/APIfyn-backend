@@ -54,8 +54,8 @@ export class WebhookService {
     });
 
     if (!webhookResponse.ok) {
-      const error = await webhookResponse.json();
-      throw new Error(`Failed to create webhook: ${error.message}`);
+      const error = await webhookResponse.json() as { message?: string };
+      throw new Error(`Failed to create webhook: ${error.message || 'Unknown error'}`);
     }
 
     return await webhookResponse.json();
@@ -98,7 +98,7 @@ export class WebhookService {
           workflowId,
           userId: workflow.userId,
           status: 'RUNNING',
-          inputData: payload
+          inputData: payload as any
         }
       });
 
@@ -134,7 +134,7 @@ export class WebhookService {
           }
         });
       }
-
+      
       throw error;
     }
   }
@@ -196,10 +196,10 @@ export class WebhookService {
       }),
     });
 
-    const slackData = await slackResponse.json();
+    const slackData = await slackResponse.json() as { ok: boolean; error?: string };
     
     if (!slackData.ok) {
-      throw new Error(`Failed to send Slack message: ${slackData.error}`);
+      throw new Error(`Failed to send Slack message: ${slackData.error || 'Unknown error'}`);
     }
 
     logger.info(`Slack message sent successfully to channel ${actionConfig.channel}`);
