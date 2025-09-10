@@ -7,38 +7,80 @@ import { createLogger } from '../utils/logger';
 const router = express.Router();
 const logger = createLogger();
 
-// Get user dashboard data (simplified version)
+// Get user dashboard data
 router.get('/dashboard', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
 
-  // Get basic statistics (placeholder values for now)
-  const dashboardData = {
-    user: {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-    },
-    stats: {
-      totalWorkflows: 0,
-      activeWorkflows: 0,
-      totalExecutions: 0,
-      totalIntegrations: 0,
-    },
-    recentActivity: [],
-    subscription: {
-      type: 'FREE',
-      name: 'Free Plan',
-      workflowsLimit: 5,
-      apiCallsLimit: 100,
-      status: 'active',
-    }
-  };
+  try {
+    // Get actual workflow statistics from database
+    const totalWorkflows = await prisma.workflow.count({
+      where: { userId: user.id }
+    });
 
-  res.json({
-    success: true,
-    data: dashboardData,
-  });
+    const activeWorkflows = await prisma.workflow.count({
+      where: { 
+        userId: user.id,
+        isActive: true 
+      }
+    });
+
+    const totalExecutions = await prisma.workflowExecution.count({
+      where: {
+        workflow: {
+          userId: user.id
+        }
+      }
+    });
+
+    const totalIntegrations = await prisma.integration.count({
+      where: { userId: user.id }
+    });
+
+    // Get recent workflow executions
+    const recentActivity = await prisma.workflowExecution.findMany({
+      where: {
+        workflow: {
+          userId: user.id
+        }
+      },
+      include: {
+        workflow: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        startedAt: 'desc'
+      },
+      take: 5
+    });
+
+    const dashboardData = {
+      totalWorkflows,
+      executionsToday: 0, // You can implement this later with date filtering
+      connectedApps: totalIntegrations,
+      thisWeek: 0, // You can implement this later with date filtering
+      recentActivity: recentActivity.map(execution => ({
+        id: execution.id,
+        type: 'workflow_execution',
+        description: `Workflow "${execution.workflow.name}" executed`,
+        status: execution.status.toLowerCase(),
+        timestamp: execution.startedAt.toISOString()
+      }))
+    };
+
+    return res.json({
+      success: true,
+      data: dashboardData,
+    });
+  } catch (error) {
+    logger.error('Error fetching dashboard data:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard data'
+    });
+  }
 }));
 
 // Get user profile

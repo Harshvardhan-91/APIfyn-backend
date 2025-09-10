@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { createLogger } from '../utils/logger';
+import { OAuthService } from './oauth.service';
 
 const logger = createLogger();
 
@@ -152,15 +153,51 @@ export class WebhookService {
 
   // Execute workflow actions (e.g., send Slack message)
   private static async executeWorkflowActions(executionId: string, workflow: any, payload: WebhookPayload): Promise<void> {
-    const actionConfig = workflow.actionConfig as any;
+    const definition = workflow.definition;
+    
+    logger.info(`Executing workflow actions for workflow ${workflow.id}`);
+    logger.info(`Full workflow definition:`, definition);
+    
+    if (!definition || !definition.blocks) {
+      logger.warn(`Workflow ${workflow.id} has no definition or blocks`);
+      return;
+    }
 
-    if (actionConfig.type === 'slack-send') {
-      await this.sendSlackMessage(workflow.userId, actionConfig, payload);
+    // Find action blocks (non-trigger blocks)
+    const actionBlocks = definition.blocks.filter((block: any) => 
+      block.type && block.type !== 'github-trigger'
+    );
+
+    logger.info(`Found ${actionBlocks.length} action blocks:`);
+    actionBlocks.forEach((block: any, index: number) => {
+      logger.info(`Block ${index}:`, {
+        type: block.type,
+        config: block.config,
+        hasConfig: !!block.config,
+        fullBlock: block
+      });
+    });
+
+    for (const actionBlock of actionBlocks) {
+      try {
+        if (actionBlock.type === 'slack-send') {
+          const config = actionBlock.config || actionBlock;
+          logger.info(`Processing slack-send block with config:`, config);
+          await this.sendSlackMessage(workflow.userId, config, payload);
+        }
+        // Add other action types here as needed
+      } catch (error) {
+        logger.error(`Error executing action block ${actionBlock.type}:`, error);
+        throw error;
+      }
     }
   }
 
   // Send Slack message
   private static async sendSlackMessage(userId: string, actionConfig: any, payload: WebhookPayload): Promise<void> {
+    logger.info(`Sending Slack message for userId: ${userId}`);
+    logger.info(`Action config received:`, actionConfig);
+    
     // Get Slack integration
     const slackIntegration = await prisma.integration.findFirst({
       where: {
@@ -173,8 +210,46 @@ export class WebhookService {
       throw new Error('Slack integration not found or not authorized');
     }
 
+    // Try to get channel from various possible locations
+    const channel = actionConfig.channel || 
+                   actionConfig.selectedChannel || 
+                   actionConfig.config?.channel ||
+                   actionConfig.config?.selectedChannel;
+    
+    logger.info(`Channel found: ${channel}`);
+    
+    // Validate required config
+    if (!channel) {
+      logger.error('Channel not found in actionConfig:', actionConfig);
+      logger.error('Available config keys:', Object.keys(actionConfig));
+      
+      // Check if user has any Slack channels available
+      try {
+        const availableChannels = await OAuthService.getSlackChannels(slackIntegration.accessToken);
+        logger.info(`User has ${availableChannels.length} available Slack channels`);
+        
+        if (availableChannels.length > 0) {
+          throw new Error(`Slack channel is required but not configured. Please edit your workflow and select a channel from the ${availableChannels.length} available channels. Go to workflow settings → Slack Message Configuration → Channel and select a channel.`);
+        } else {
+          throw new Error('No Slack channels found. Please ensure your Slack integration has access to channels and try reconnecting Slack.');
+        }
+      } catch (channelError) {
+        logger.error('Error checking available channels:', channelError);
+        throw new Error('Slack channel is required but not configured. Please edit your workflow and select a channel in the Slack Message Configuration section.');
+      }
+    }
+
+    // Try to get message template from various possible locations
+    const messageTemplate = actionConfig.messageTemplate || 
+                           actionConfig.message ||
+                           actionConfig.config?.messageTemplate ||
+                           actionConfig.config?.message ||
+                           '';
+
     // Build message from template
-    const message = this.buildSlackMessage(actionConfig.messageTemplate || '', payload);
+    const message = this.buildSlackMessage(messageTemplate, payload);
+    
+    logger.info(`Built Slack message: "${message}" for channel: ${channel}`);
 
     // Send message to Slack
     const slackResponse = await fetch('https://slack.com/api/chat.postMessage', {
@@ -184,7 +259,7 @@ export class WebhookService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        channel: actionConfig.channel,
+        channel: channel,
         text: message,
         blocks: [
           {
@@ -213,7 +288,7 @@ export class WebhookService {
       throw new Error(`Failed to send Slack message: ${slackData.error || 'Unknown error'}`);
     }
 
-    logger.info(`Slack message sent successfully to channel ${actionConfig.channel}`);
+    logger.info(`Slack message sent successfully to channel ${channel}`);
   }
 
   // Build Slack message from template with payload data
