@@ -59,6 +59,7 @@ export class OAuthService {
 
     const state = `${userId}_${Date.now()}`;
     const scope = 'repo,read:user';
+    
     return `https://github.com/login/oauth/authorize?client_id=${githubClientId}&scope=${scope}&state=${state}`;
   }
 
