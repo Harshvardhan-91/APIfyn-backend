@@ -27,6 +27,17 @@ export interface WebhookPayload {
   before: string;
   after: string;
   compare: string;
+  action?: string; // For pull request events (opened, closed, etc.)
+  pull_request?: {
+    title: string;
+    body: string;
+    user: {
+      login: string;
+      avatar_url: string;
+    };
+    html_url: string;
+    number: number;
+  };
 }
 
 export class WebhookService {
@@ -208,35 +219,40 @@ export class WebhookService {
   // Build Slack message from template with payload data
   private static buildSlackMessage(template: string, payload: WebhookPayload): string {
     if (!template) {
-      // Default message template
-      template = `🚀 New push to *{{repository.name}}*\n\n` +
-                `*Pusher:* {{pusher.name}}\n` +
-                `*Branch:* {{ref}}\n` +
-                `*Commits:* {{commits.length}}\n\n` +
-                `{{#each commits}}• {{message}} by {{author.name}}\n{{/each}}\n` +
-                `<{{compare}}|View changes>`;
+      // Default message template with simple variables
+      template = `🚀 New push to {{repository_name}} by {{author_name}}!`;
     }
 
-    // Simple template replacement (you might want to use a proper template engine)
+    // Simple variable replacements (user-friendly)
     let message = template
-      .replace(/\{\{repository\.name\}\}/g, payload.repository.name)
-      .replace(/\{\{repository\.full_name\}\}/g, payload.repository.full_name)
-      .replace(/\{\{pusher\.name\}\}/g, payload.pusher.name)
-      .replace(/\{\{pusher\.email\}\}/g, payload.pusher.email)
-      .replace(/\{\{ref\}\}/g, payload.ref.replace('refs/heads/', ''))
-      .replace(/\{\{commits\.length\}\}/g, payload.commits.length.toString())
-      .replace(/\{\{compare\}\}/g, payload.compare);
+      .replace(/\{\{repository_name\}\}/g, payload.repository.name)
+      .replace(/\{\{author_name\}\}/g, payload.pusher.name)
+      .replace(/\{\{pull_request_title\}\}/g, payload.pull_request?.title || 'N/A')
+      .replace(/\{\{action\}\}/g, payload.action || 'updated');
 
-    // Handle commit loop
+    // Advanced variable replacements (for backward compatibility)
+    message = message
+      .replace(/\{\{payload\.repository\.name\}\}/g, payload.repository.name)
+      .replace(/\{\{payload\.repository\.full_name\}\}/g, payload.repository.full_name)
+      .replace(/\{\{payload\.pusher\.name\}\}/g, payload.pusher.name)
+      .replace(/\{\{payload\.pusher\.email\}\}/g, payload.pusher.email)
+      .replace(/\{\{payload\.pull_request\.title\}\}/g, payload.pull_request?.title || 'N/A')
+      .replace(/\{\{payload\.pull_request\.user\.login\}\}/g, payload.pull_request?.user?.login || 'N/A')
+      .replace(/\{\{payload\.action\}\}/g, payload.action || 'updated')
+      .replace(/\{\{payload\.ref\}\}/g, payload.ref?.replace('refs/heads/', '') || 'main')
+      .replace(/\{\{payload\.commits\.length\}\}/g, payload.commits?.length?.toString() || '0')
+      .replace(/\{\{payload\.compare\}\}/g, payload.compare || '');
+
+    // Handle commit loop (advanced feature)
     if (template.includes('{{#each commits}}')) {
       const commitTemplate = template.match(/\{\{#each commits\}\}(.*?)\{\{\/each\}\}/s)?.[1] || '';
-      const commitMessages = payload.commits.map(commit => 
+      const commitMessages = payload.commits?.map(commit => 
         commitTemplate
           .replace(/\{\{message\}\}/g, commit.message)
           .replace(/\{\{author\.name\}\}/g, commit.author.name)
           .replace(/\{\{author\.email\}\}/g, commit.author.email)
           .replace(/\{\{url\}\}/g, commit.url)
-      ).join('');
+      ).join('') || '';
       
       message = message.replace(/\{\{#each commits\}\}.*?\{\{\/each\}\}/s, commitMessages);
     }

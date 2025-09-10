@@ -145,7 +145,8 @@ export class OAuthService {
     }
 
     const state = `${userId}_${Date.now()}`;
-    const scope = 'channels:read,chat:write,users:read';
+    // Updated scope to include all necessary permissions
+    const scope = 'channels:read,groups:read,im:read,mpim:read,chat:write,chat:write.public,users:read,team:read';
     return `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${scope}&state=${state}`;
   }
 
@@ -232,25 +233,33 @@ export class OAuthService {
 
   // Get channels from Slack
   static async getSlackChannels(accessToken: string) {
-    const channelsResponse = await fetch('https://slack.com/api/conversations.list?types=public_channel,private_channel', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    try {
+      const channelsResponse = await fetch('https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=100', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    const channelsData = await channelsResponse.json() as SlackChannelsResponse;
-    
-    if (!channelsData.ok) {
-      throw new Error(channelsData.error || 'Failed to fetch channels');
+      const channelsData = await channelsResponse.json() as SlackChannelsResponse;
+      
+      if (!channelsData.ok) {
+        if (channelsData.error === 'missing_scope') {
+          throw new Error('Slack integration needs to be re-authorized with updated permissions. Please disconnect and reconnect your Slack account.');
+        }
+        throw new Error(channelsData.error || 'Failed to fetch channels');
+      }
+
+      return channelsData.channels.map((channel) => ({
+        id: channel.id,
+        name: channel.name,
+        is_private: channel.is_private,
+        is_channel: channel.is_channel,
+        is_group: channel.is_group
+      }));
+    } catch (error) {
+      logger.error('Error fetching Slack channels:', error);
+      throw error;
     }
-
-    return channelsData.channels.map((channel) => ({
-      id: channel.id,
-      name: channel.name,
-      is_private: channel.is_private,
-      is_channel: channel.is_channel,
-      is_group: channel.is_group
-    }));
   }
 }

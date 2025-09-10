@@ -242,4 +242,43 @@ router.get('/slack/channels', authenticateFirebaseToken, asyncHandler(async (req
   }
 }));
 
+// Disconnect integration
+router.delete('/:provider/disconnect', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  const { provider } = req.params;
+
+  try {
+    const integrationTypes = {
+      'github': 'GITHUB',
+      'slack': 'SLACK'
+    };
+
+    const integrationType = integrationTypes[provider as keyof typeof integrationTypes];
+    if (!integrationType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid integration provider'
+      });
+    }
+
+    await prisma.integration.deleteMany({
+      where: {
+        userId: user.id,
+        type: integrationType as any
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: `${provider} integration disconnected successfully`
+    });
+  } catch (error) {
+    logger.error(`Error disconnecting ${provider} integration:`, error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to disconnect ${provider} integration`
+    });
+  }
+}));
+
 export default router;
