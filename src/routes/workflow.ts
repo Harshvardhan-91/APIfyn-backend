@@ -90,6 +90,23 @@ router.get('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticate
       }
     });
 
+    // Fetch execution counts for each workflow
+    const workflowIds = workflows.map(w => w.id);
+    const executionCounts = await prisma.workflowExecution.groupBy({
+      by: ['workflowId'],
+      where: {
+        workflowId: { in: workflowIds }
+      },
+      _count: {
+        workflowId: true
+      }
+    });
+
+    // Map workflowId to count
+    const countMap = Object.fromEntries(
+      executionCounts.map(ec => [ec.workflowId, ec._count.workflowId])
+    );
+
     return res.json({
       success: true,
       workflows: workflows.map(workflow => ({
@@ -101,7 +118,8 @@ router.get('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticate
         triggerType: workflow.triggerType,
         isActive: workflow.isActive,
         createdAt: workflow.createdAt,
-        updatedAt: workflow.updatedAt
+        updatedAt: workflow.updatedAt,
+        totalRuns: countMap[workflow.id] || 0
       }))
     });
   } catch (error) {
