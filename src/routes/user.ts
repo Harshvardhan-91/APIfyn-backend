@@ -36,6 +36,40 @@ router.get('/dashboard', authenticateFirebaseToken, asyncHandler(async (req: Aut
       where: { userId: user.id }
     });
 
+    // Get executions today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const executionsToday = await prisma.workflowExecution.count({
+      where: {
+        workflow: {
+          userId: user.id
+        },
+        startedAt: {
+          gte: today,
+          lt: tomorrow
+        }
+      }
+    });
+
+    // Get executions this week
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const executionsThisWeek = await prisma.workflowExecution.count({
+      where: {
+        workflow: {
+          userId: user.id
+        },
+        startedAt: {
+          gte: startOfWeek
+        }
+      }
+    });
+
     // Get recent workflow executions
     const recentActivity = await prisma.workflowExecution.findMany({
       where: {
@@ -58,9 +92,9 @@ router.get('/dashboard', authenticateFirebaseToken, asyncHandler(async (req: Aut
 
     const dashboardData = {
       totalWorkflows,
-      executionsToday: 0, // You can implement this later with date filtering
+      executionsToday,
       connectedApps: totalIntegrations,
-      thisWeek: 0, // You can implement this later with date filtering
+      thisWeek: executionsThisWeek,
       recentActivity: recentActivity.map(execution => ({
         id: execution.id,
         type: 'workflow_execution',

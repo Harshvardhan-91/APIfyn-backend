@@ -151,9 +151,73 @@ router.get('/:id', authenticateFirebaseToken, asyncHandler(async (req: Authentic
       });
     }
 
+    // Get execution statistics for this workflow
+    const totalRuns = await prisma.workflowExecution.count({
+      where: { workflowId: id }
+    });
+
+    const successfulRuns = await prisma.workflowExecution.count({
+      where: { 
+        workflowId: id,
+        status: 'SUCCESS'
+      }
+    });
+
+    const failedRuns = await prisma.workflowExecution.count({
+      where: { 
+        workflowId: id,
+        status: 'FAILED'
+      }
+    });
+
+    // Get recent executions for this workflow
+    const executions = await prisma.workflowExecution.findMany({
+      where: { workflowId: id },
+      orderBy: { startedAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        status: true,
+        startedAt: true,
+        completedAt: true,
+        errorMessage: true
+      }
+    });
+
+    // Calculate average execution time
+    const completedExecutions = await prisma.workflowExecution.findMany({
+      where: { 
+        workflowId: id,
+        status: 'SUCCESS',
+        completedAt: { not: null }
+      },
+      select: {
+        startedAt: true,
+        completedAt: true
+      }
+    });
+
+    let avgExecutionTime = null;
+    if (completedExecutions.length > 0) {
+      const totalTime = completedExecutions.reduce((sum, exec) => {
+        const duration = new Date(exec.completedAt!).getTime() - new Date(exec.startedAt).getTime();
+        return sum + duration;
+      }, 0);
+      avgExecutionTime = Math.round(totalTime / completedExecutions.length);
+    }
+
+    const workflowWithStats = {
+      ...workflow,
+      totalRuns,
+      successfulRuns,
+      failedRuns,
+      avgExecutionTime,
+      executions
+    };
+
     return res.json({
       success: true,
-      workflow
+      workflow: workflowWithStats
     });
   } catch (error) {
     logger.error('Error fetching workflow:', error);
