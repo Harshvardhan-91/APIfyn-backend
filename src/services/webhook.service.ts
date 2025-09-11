@@ -44,7 +44,7 @@ export interface WebhookPayload {
 export class WebhookService {
   // Create GitHub webhook for a repository
   static async createGitHubWebhook(accessToken: string, repoFullName: string, workflowId: string): Promise<any> {
-    const webhookUrl = `${process.env.FRONTEND_URL}/api/webhooks/github/${workflowId}`;
+    const webhookUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/github/${workflowId}`;
     
     const webhookResponse = await fetch(`https://api.github.com/repos/${repoFullName}/hooks`, {
       method: 'POST',
