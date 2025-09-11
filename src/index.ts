@@ -17,6 +17,7 @@ import integrationRoutes from './routes/integration';
 import webhookRoutes from './routes/webhook';
 import notificationRoutes from './routes/notification';
 import { prisma } from './db';
+import { KeepAliveService } from './services/keepAlive.service';
 
 // Load environment variables
 dotenv.config();
@@ -195,6 +196,8 @@ app.get('/api/health', async (req: Request, res: Response) => {
     // Check database connection
     await prisma.$queryRaw`SELECT 1`;
     
+    const keepAliveStatus = KeepAliveService.getStatus();
+    
     res.json({
       status: 'OK',
       timestamp: new Date().toISOString(),
@@ -202,6 +205,10 @@ app.get('/api/health', async (req: Request, res: Response) => {
       environment: process.env.NODE_ENV || 'development',
       version: process.env.npm_package_version || '1.0.0',
       database: 'connected',
+      keepAlive: {
+        running: keepAliveStatus.running,
+        intervalMinutes: keepAliveStatus.interval / 1000 / 60
+      }
     });
   } catch (error) {
     logger.error('Health check failed:', error);
@@ -274,6 +281,9 @@ const startServer = async (): Promise<void> => {
       logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
       logger.info(`📖 API docs: http://localhost:${PORT}/api/docs`);
+      
+      // Start keep-alive service to prevent server from sleeping
+      KeepAliveService.start();
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
@@ -284,12 +294,27 @@ const startServer = async (): Promise<void> => {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error: Error) => {
   logger.error('Uncaught Exception:', error);
+  KeepAliveService.stop();
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  KeepAliveService.stop();
   process.exit(1);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  KeepAliveService.stop();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  KeepAliveService.stop();
+  process.exit(0);
 });
 
 startServer();
