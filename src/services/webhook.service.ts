@@ -46,6 +46,10 @@ export class WebhookService {
   static async createGitHubWebhook(accessToken: string, repoFullName: string, workflowId: string): Promise<any> {
     const webhookUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/github/${workflowId}`;
     
+    logger.info(`Creating GitHub webhook for repo: ${repoFullName}`);
+    logger.info(`Webhook URL: ${webhookUrl}`);
+    logger.info(`Workflow ID: ${workflowId}`);
+    
     const webhookResponse = await fetch(`https://api.github.com/repos/${repoFullName}/hooks`, {
       method: 'POST',
       headers: {
@@ -65,12 +69,17 @@ export class WebhookService {
       }),
     });
 
+    logger.info(`GitHub webhook creation response status: ${webhookResponse.status}`);
+
     if (!webhookResponse.ok) {
       const error = await webhookResponse.json() as { message?: string };
+      logger.error(`GitHub webhook creation failed:`, error);
       throw new Error(`Failed to create webhook: ${error.message || 'Unknown error'}`);
     }
 
-    return await webhookResponse.json();
+    const result = await webhookResponse.json();
+    logger.info(`GitHub webhook created successfully:`, result);
+    return result;
   }
 
   // Delete GitHub webhook

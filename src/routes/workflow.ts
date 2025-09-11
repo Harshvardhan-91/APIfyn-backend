@@ -41,11 +41,15 @@ router.post('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticat
     // Auto-setup webhooks for GitHub trigger workflows
     if (workflow.isActive) {
       try {
+        logger.info(`Setting up webhooks for active workflow ${workflow.id}`);
         await setupWorkflowWebhooks(workflow, user.id);
+        logger.info(`Webhook setup completed for workflow ${workflow.id}`);
       } catch (webhookError) {
-        logger.warn('Failed to setup webhooks for workflow:', webhookError);
+        logger.error('Failed to setup webhooks for workflow:', webhookError);
         // Don't fail the workflow creation if webhook setup fails
       }
+    } else {
+      logger.info(`Skipping webhook setup for inactive workflow ${workflow.id}`);
     }
 
     return res.json({
@@ -251,12 +255,16 @@ router.delete('/:id', authenticateFirebaseToken, asyncHandler(async (req: Authen
 
 // Helper function to setup webhooks for a workflow
 async function setupWorkflowWebhooks(workflow: any, userId: string) {
+  logger.info(`Starting webhook setup for workflow ${workflow.id}, user ${userId}`);
+  
   const definition = workflow.definition;
   
   // Check if workflow has GitHub trigger
   const hasGitHubTrigger = definition.blocks?.some((block: any) => 
     block.type === 'github-trigger'
   );
+
+  logger.info(`Workflow ${workflow.id} has GitHub trigger: ${hasGitHubTrigger}`);
 
   if (hasGitHubTrigger) {
     // Get GitHub integration
@@ -267,25 +275,37 @@ async function setupWorkflowWebhooks(workflow: any, userId: string) {
       }
     });
 
+    logger.info(`GitHub integration found for user ${userId}: ${!!githubIntegration}`);
+    logger.info(`GitHub integration has access token: ${!!githubIntegration?.accessToken}`);
+
     if (githubIntegration?.accessToken) {
       // Find the GitHub trigger block to get repository config
       const githubBlock = definition.blocks.find((block: any) => 
         block.type === 'github-trigger'
       );
 
+      logger.info(`GitHub block config:`, githubBlock?.config);
+
       if (githubBlock?.config?.repository) {
         try {
-          await WebhookService.createGitHubWebhook(
+          logger.info(`Creating GitHub webhook for repo: ${githubBlock.config.repository}, workflow: ${workflow.id}`);
+          
+          const webhookResult = await WebhookService.createGitHubWebhook(
             githubIntegration.accessToken,
             githubBlock.config.repository,
             workflow.id
           );
-          logger.info(`GitHub webhook created for workflow ${workflow.id}`);
+          
+          logger.info(`GitHub webhook created successfully for workflow ${workflow.id}:`, webhookResult);
         } catch (error) {
           logger.error(`Failed to create GitHub webhook for workflow ${workflow.id}:`, error);
           throw error;
         }
+      } else {
+        logger.warn(`No repository configured in GitHub block for workflow ${workflow.id}`);
       }
+    } else {
+      logger.warn(`No GitHub access token found for user ${userId}`);
     }
   }
 }
