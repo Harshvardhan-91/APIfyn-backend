@@ -76,6 +76,102 @@ router.post('/', authenticateFirebaseToken, asyncHandler(async (req: Authenticat
   }
 }));
 
+// Update an existing workflow
+router.put('/:id', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  const { id } = req.params;
+  const { name, description, definition, category, triggerType, isActive } = req.body;
+
+  try {
+    // Validate required fields
+    if (!name || !definition) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name and definition are required'
+      });
+    }
+
+    // Check if workflow exists and belongs to user
+    const existingWorkflow = await prisma.workflow.findFirst({
+      where: {
+        id,
+        userId: user.id
+      }
+    });
+
+    if (!existingWorkflow) {
+      return res.status(404).json({
+        success: false,
+        error: 'Workflow not found'
+      });
+    }
+
+    // Update the workflow
+    const workflow = await prisma.workflow.update({
+      where: { id },
+      data: {
+        name,
+        description: description || '',
+        definition: definition as any, // Prisma handles JSON automatically
+        category: category || 'general',
+        triggerType: triggerType || 'MANUAL',
+        isActive: isActive !== undefined ? isActive : true,
+        updatedAt: new Date()
+      }
+    });
+
+    logger.info(`Workflow updated successfully: ${workflow.id} for user ${user.id}`);
+
+    // Handle webhook setup/teardown based on isActive status
+    if (workflow.isActive && !existingWorkflow.isActive) {
+      // Workflow was activated - setup webhooks
+      try {
+        logger.info(`Setting up webhooks for newly activated workflow ${workflow.id}`);
+        await setupWorkflowWebhooks(workflow, user.id);
+        logger.info(`Webhook setup completed for workflow ${workflow.id}`);
+      } catch (webhookError) {
+        logger.error('Failed to setup webhooks for workflow:', webhookError);
+        // Don't fail the workflow update if webhook setup fails
+      }
+    } else if (!workflow.isActive && existingWorkflow.isActive) {
+      // Workflow was deactivated - could implement webhook cleanup here if needed
+      logger.info(`Workflow ${workflow.id} deactivated`);
+    } else if (workflow.isActive) {
+      // Workflow is still active - update webhooks if definition changed
+      try {
+        logger.info(`Updating webhooks for modified workflow ${workflow.id}`);
+        await setupWorkflowWebhooks(workflow, user.id);
+        logger.info(`Webhook update completed for workflow ${workflow.id}`);
+      } catch (webhookError) {
+        logger.error('Failed to update webhooks for workflow:', webhookError);
+        // Don't fail the workflow update if webhook setup fails
+      }
+    }
+
+    return res.json({
+      success: true,
+      workflow: {
+        id: workflow.id,
+        name: workflow.name,
+        description: workflow.description,
+        definition: workflow.definition,
+        category: workflow.category,
+        triggerType: workflow.triggerType,
+        isActive: workflow.isActive,
+        createdAt: workflow.createdAt,
+        updatedAt: workflow.updatedAt
+      },
+      message: 'Workflow updated successfully'
+    });
+  } catch (error) {
+    logger.error('Error updating workflow:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update workflow'
+    });
+  }
+}));
+
 // Get all workflows for user
 router.get('/', authenticateFirebaseToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
