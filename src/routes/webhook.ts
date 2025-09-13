@@ -60,21 +60,31 @@ router.post('/test/:workflowId', asyncHandler(async (req: Request, res: Response
       name: 'Test User',
       email: 'test@example.com'
     },
+    head_commit: {
+      id: 'abc123def456',
+      message: 'Add new feature: Enhanced user authentication',
+      author: {
+        name: 'Test User',
+        email: 'test@example.com'
+      },
+      url: 'https://github.com/user/test-repo/commit/abc123def456',
+      timestamp: new Date().toISOString()
+    },
     commits: [
       {
-        id: 'abc123',
-        message: 'Test commit for webhook',
+        id: 'abc123def456',
+        message: 'Add new feature: Enhanced user authentication',
         author: {
           name: 'Test User',
           email: 'test@example.com'
         },
-        url: 'https://github.com/user/test-repo/commit/abc123'
+        url: 'https://github.com/user/test-repo/commit/abc123def456'
       }
     ],
     ref: 'refs/heads/main',
-    before: 'def456',
-    after: 'abc123',
-    compare: 'https://github.com/user/test-repo/compare/def456...abc123'
+    before: 'def456abc789',
+    after: 'abc123def456',
+    compare: 'https://github.com/user/test-repo/compare/def456abc789...abc123def456'
   };
 
   try {

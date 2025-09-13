@@ -15,6 +15,16 @@ export interface WebhookPayload {
     name: string;
     email: string;
   };
+  head_commit?: {
+    id: string;
+    message: string;
+    author: {
+      name: string;
+      email: string;
+    };
+    url: string;
+    timestamp?: string;
+  };
   commits: Array<{
     id: string;
     message: string;
@@ -44,7 +54,11 @@ export interface WebhookPayload {
 export class WebhookService {
   // Create GitHub webhook for a repository
   static async createGitHubWebhook(accessToken: string, repoFullName: string, workflowId: string): Promise<any> {
-    const webhookUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/github/${workflowId}`;
+    const webhookUrl = `${process.env.BASE_URL}/api/webhooks/github/${workflowId}`;
+    
+    if (!process.env.BASE_URL) {
+      throw new Error('BASE_URL environment variable is required for webhook creation');
+    }
     
     logger.info(`Creating GitHub webhook for repo: ${repoFullName}`);
     logger.info(`Webhook URL: ${webhookUrl}`);
@@ -307,14 +321,27 @@ export class WebhookService {
       template = `🚀 New push to {{repository_name}} by {{author_name}}!`;
     }
 
+    // Get the latest commit (head commit) for GitHub push events
+    // GitHub provides head_commit for push events, but fallback to latest commit if not available
+    const headCommit = payload.head_commit || 
+      (payload.commits && payload.commits.length > 0 
+        ? payload.commits[payload.commits.length - 1] 
+        : null);
+
     // Simple variable replacements (user-friendly)
     let message = template
       .replace(/\{\{repository_name\}\}/g, payload.repository.name)
       .replace(/\{\{author_name\}\}/g, payload.pusher.name)
       .replace(/\{\{pull_request_title\}\}/g, payload.pull_request?.title || 'N/A')
-      .replace(/\{\{action\}\}/g, payload.action || 'updated');
+      .replace(/\{\{action\}\}/g, payload.action || 'updated')
+      .replace(/\{\{commit_message\}\}/g, headCommit?.message || 'No commit message')
+      .replace(/\{\{branch_name\}\}/g, payload.ref?.replace('refs/heads/', '') || 'main')
+      .replace(/\{\{commit_url\}\}/g, headCommit?.url || payload.repository.html_url)
+      .replace(/\{\{files_changed\}\}/g, payload.commits?.length?.toString() || '0')
+      .replace(/\{\{additions\}\}/g, '0') // GitHub doesn't provide this in simple webhooks
+      .replace(/\{\{deletions\}\}/g, '0'); // GitHub doesn't provide this in simple webhooks
 
-    // Advanced variable replacements (for backward compatibility)
+    // Advanced variable replacements (for backward compatibility and new features)
     message = message
       .replace(/\{\{payload\.repository\.name\}\}/g, payload.repository.name)
       .replace(/\{\{payload\.repository\.full_name\}\}/g, payload.repository.full_name)
@@ -325,7 +352,13 @@ export class WebhookService {
       .replace(/\{\{payload\.action\}\}/g, payload.action || 'updated')
       .replace(/\{\{payload\.ref\}\}/g, payload.ref?.replace('refs/heads/', '') || 'main')
       .replace(/\{\{payload\.commits\.length\}\}/g, payload.commits?.length?.toString() || '0')
-      .replace(/\{\{payload\.compare\}\}/g, payload.compare || '');
+      .replace(/\{\{payload\.compare\}\}/g, payload.compare || '')
+      // Head commit specific variables (most commonly used)
+      .replace(/\{\{payload\.head_commit\.message\}\}/g, headCommit?.message || 'No commit message')
+      .replace(/\{\{payload\.head_commit\.url\}\}/g, headCommit?.url || payload.repository.html_url)
+      .replace(/\{\{payload\.head_commit\.author\.name\}\}/g, headCommit?.author?.name || payload.pusher.name)
+      .replace(/\{\{payload\.head_commit\.author\.email\}\}/g, headCommit?.author?.email || payload.pusher.email)
+      .replace(/\{\{payload\.head_commit\.id\}\}/g, headCommit?.id || 'unknown');
 
     // Handle commit loop (advanced feature)
     if (template.includes('{{#each commits}}')) {
@@ -336,10 +369,16 @@ export class WebhookService {
           .replace(/\{\{author\.name\}\}/g, commit.author.name)
           .replace(/\{\{author\.email\}\}/g, commit.author.email)
           .replace(/\{\{url\}\}/g, commit.url)
+          .replace(/\{\{id\}\}/g, commit.id)
       ).join('') || '';
       
       message = message.replace(/\{\{#each commits\}\}.*?\{\{\/each\}\}/s, commitMessages);
     }
+
+    // Log the final processed message for debugging
+    logger.info(`Original template: ${template}`);
+    logger.info(`Processed message: ${message}`);
+    logger.info(`Head commit data:`, headCommit);
 
     return message;
   }
