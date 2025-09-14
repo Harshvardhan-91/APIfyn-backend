@@ -328,6 +328,13 @@ export class WebhookService {
         ? payload.commits[payload.commits.length - 1] 
         : null);
 
+    // Log debug information
+    logger.info(`Building Slack message with template: ${template}`);
+    logger.info(`Head commit data:`, headCommit);
+    logger.info(`Head commit URL:`, headCommit?.url);
+    logger.info(`Repository data:`, JSON.stringify(payload.repository, null, 2));
+    logger.info(`Pusher data:`, JSON.stringify(payload.pusher, null, 2));
+
     // Simple variable replacements (user-friendly)
     let message = template
       .replace(/\{\{repository_name\}\}/g, payload.repository.name)
@@ -342,6 +349,8 @@ export class WebhookService {
       .replace(/\{\{deletions\}\}/g, '0'); // GitHub doesn't provide this in simple webhooks
 
     // Advanced variable replacements (for backward compatibility and new features)
+    logger.info(`Before advanced replacements: ${message}`);
+    
     message = message
       .replace(/\{\{payload\.repository\.name\}\}/g, payload.repository.name)
       .replace(/\{\{payload\.repository\.full_name\}\}/g, payload.repository.full_name)
@@ -352,13 +361,34 @@ export class WebhookService {
       .replace(/\{\{payload\.action\}\}/g, payload.action || 'updated')
       .replace(/\{\{payload\.ref\}\}/g, payload.ref?.replace('refs/heads/', '') || 'main')
       .replace(/\{\{payload\.commits\.length\}\}/g, payload.commits?.length?.toString() || '0')
-      .replace(/\{\{payload\.compare\}\}/g, payload.compare || '')
-      // Head commit specific variables (most commonly used)
+      .replace(/\{\{payload\.compare\}\}/g, payload.compare || '');
+
+    // Head commit specific variables (most commonly used) - with explicit logging
+    const headCommitUrl = headCommit?.url || payload.repository.html_url;
+    logger.info(`Head commit URL for replacement: ${headCommitUrl}`);
+    
+    // More robust replacement - handle all possible cases
+    const urlPattern = '{{payload.head_commit.url}}';
+    const urlPatternNoClosing = '{{payload.head_commit.url}'; // Handle missing closing brace
+    
+    if (message.includes(urlPattern)) {
+      message = message.replace(new RegExp(urlPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), headCommitUrl);
+    }
+    if (message.includes(urlPatternNoClosing)) {
+      message = message.replace(new RegExp(urlPatternNoClosing.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), headCommitUrl);
+    }
+    
+    message = message
       .replace(/\{\{payload\.head_commit\.message\}\}/g, headCommit?.message || 'No commit message')
-      .replace(/\{\{payload\.head_commit\.url\}\}/g, headCommit?.url || payload.repository.html_url)
       .replace(/\{\{payload\.head_commit\.author\.name\}\}/g, headCommit?.author?.name || payload.pusher.name)
       .replace(/\{\{payload\.head_commit\.author\.email\}\}/g, headCommit?.author?.email || payload.pusher.email)
       .replace(/\{\{payload\.head_commit\.id\}\}/g, headCommit?.id || 'unknown');
+
+    logger.info(`After advanced replacements: ${message}`);
+    logger.info(`Head commit URL being used: ${headCommit?.url}`);
+    logger.info(`Template contains head_commit.url: ${template.includes('{{payload.head_commit.url}}')}`);
+    logger.info(`Message contains unreplaced head_commit.url: ${message.includes('{{payload.head_commit.url}}')}`);
+    
 
     // Handle commit loop (advanced feature)
     if (template.includes('{{#each commits}}')) {
@@ -378,7 +408,7 @@ export class WebhookService {
     // Log the final processed message for debugging
     logger.info(`Original template: ${template}`);
     logger.info(`Processed message: ${message}`);
-    logger.info(`Head commit data:`, headCommit);
+    logger.info(`Variables replaced: ${template !== message}`);
 
     return message;
   }
